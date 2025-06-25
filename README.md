@@ -1,12 +1,11 @@
 # TGMT
 
 # 🎯 Hệ thống Điểm danh Khuôn mặt
-
-Môn học: **Thị Giác Máy Tính**
-Lớp: **DA21TTA**
-Chuyên ngành: **Công nghệ thông tin**
-Giảng viên: **Đoàn Phước Miền**
-Nhóm Thực hiện: **Trần Bá Hiếu** **Sĩ Chí Thiện** **Phan Minh Thứ**
+**Môn học:** Thị Giác Máy Tính  
+**Lớp:** DA21TTA  
+**Chuyên ngành:** Công nghệ thông tin  
+**Giảng viên:** Đoàn Phước Miền  
+**Nhóm Thực hiện:** Trần Bá Hiếu, Sĩ Chí Thiện, Phan Minh Thứ  
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![Flask](https://img.shields.io/badge/Flask-2.3+-green.svg)
