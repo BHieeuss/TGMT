@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Báo cáo điểm danh{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-chart-bar me-2"></i>Báo cáo điểm danh</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{{ url_for('reports.statistics') }}" class="btn btn-outline-info">
+                <i class="fas fa-chart-pie me-1"></i>Thống kê
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Section -->
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-filter me-2"></i>Bộ lọc báo cáo
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label for="class_id" class="form-label">Lớp học</label>
+                <select class="form-select" id="class_id" name="class_id">
+                    <option value="">-- Tất cả lớp --</option>
+                    {% for class in classes %}
+                    <option value="{{ class.id }}" {% if filters.class_id == class.id %}selected{% endif %}>
+                        {{ class.class_code }} - {{ class.class_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="subject_id" class="form-label">Môn học</label>
+                <select class="form-select" id="subject_id" name="subject_id">
+                    <option value="">-- Tất cả môn --</option>
+                    {% for subject in subjects %}
+                    <option value="{{ subject.id }}" {% if filters.subject_id == subject.id %}selected{% endif %}>
+                        {{ subject.subject_code }} - {{ subject.subject_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="start_date" class="form-label">Từ ngày</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" 
+                       value="{{ filters.start_date or '' }}">
+            </div>
+            <div class="col-md-2">
+                <label for="end_date" class="form-label">Đến ngày</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" 
+                       value="{{ filters.end_date or '' }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-search me-1"></i>Lọc
+                </button>
+                <a href="{{ url_for('reports.attendance_report') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-undo me-1"></i>Reset
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Results Section -->
+<div class="card shadow">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-table me-2"></i>Kết quả báo cáo
+        </h5>
+        {% if records %}
+        <a href="{{ url_for('reports.export_excel', **filters) }}" class="btn btn-success">
+            <i class="fas fa-file-excel me-1"></i>Xuất Excel
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if records %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Ngày</th>
+                            <th>Ca học</th>
+                            <th>Môn học</th>
+                            <th>Lớp</th>
+                            <th>MSSV</th>
+                            <th>Họ tên</th>
+                            <th>Trạng thái</th>
+                            <th>Thời gian</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            <td>{{ record.session_date }}</td>
+                            <td>
+                                <strong>{{ record.session_name }}</strong>
+                                <br><small class="text-muted">{{ record.start_time }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ record.subject_name }}</span>
+                            </td>
+                            <td>{{ record.class_name }}</td>
+                            <td><strong>{{ record.student_id }}</strong></td>
+                            <td>{{ record.full_name }}</td>
+                            <td>
+                                {% if record.final_status == 'present' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Có mặt
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times me-1"></i>Vắng
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.attendance_time %}
+                                    {{ record.attendance_time.split(' ')[1] if ' ' in record.attendance_time else record.attendance_time }}
+                                    {% if record.method %}
+                                        <br><small class="text-muted">
+                                            {% if record.method == 'face_recognition' %}
+                                                <i class="fas fa-camera me-1"></i>Nhận diện
+                                            {% else %}
+                                                <i class="fas fa-keyboard me-1"></i>Thủ công
+                                            {% endif %}
+                                        </small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Summary Statistics -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Thống kê tổng hợp:</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <strong>Tổng số bản ghi:</strong> {{ records|length }}
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Có mặt:</strong> {{ records|selectattr('final_status', 'equalto', 'present')|list|length }}
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Vắng:</strong> {{ records|selectattr('final_status', 'equalto', 'absent')|list|length }}
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Tỷ lệ có mặt:</strong> 
+                                {% set present_count = records|selectattr('final_status', 'equalto', 'present')|list|length %}
+                                {% set total_count = records|length %}
+                                {% if total_count > 0 %}
+                                    {{ "%.1f"|format((present_count / total_count * 100)) }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Không tìm thấy dữ liệu</h5>
+                <p class="text-muted">Hãy thử điều chỉnh bộ lọc để tìm kiếm dữ liệu phù hợp</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Set default date range if not specified
+document.addEventListener('DOMContentLoaded', function() {
+    const startDate = document.getElementById('start_date');
+    const endDate = document.getElementById('end_date');
+    
+    if (!startDate.value) {
+        // Set start date to 30 days ago
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        startDate.value = thirtyDaysAgo.toISOString().split('T')[0];
+    }
+    
+    if (!endDate.value) {
+        // Set end date to today
+        const today = new Date();
+        endDate.value = today.toISOString().split('T')[0];
+    }
+});
+</script>
+{% endblock %}

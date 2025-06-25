@@ -1,0 +1,96 @@
+{% extends "base.html" %} {% block title %}Thêm sinh viên{% endblock %} {% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+  <h1 class="h2"><i class="fas fa-user-plus me-2"></i>Thêm sinh viên mới</h1>
+  <div class="btn-toolbar mb-2 mb-md-0">
+    <a href="{{ url_for('students.list_students') }}" class="btn btn-outline-secondary"> <i class="fas fa-arrow-left me-1"></i>Quay lại </a>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-user-graduate me-2"></i>Thông tin sinh viên</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" enctype="multipart/form-data" data-validate>
+          <div class="row">
+            <!-- Photo Upload Section -->
+            <div class="col-md-4 text-center">
+              <div class="mb-3">
+                <label class="form-label">Ảnh đại diện</label>
+                <div class="image-upload-container">
+                  <img id="photoPreview" src="{{ url_for('static', filename='img/default-avatar.png') }}" alt="Preview" class="image-upload-preview mb-3" style="width: 200px; height: 200px; object-fit: cover; border-radius: 15px; border: 3px solid #e9ecef" />
+                </div>
+                <input type="file" class="form-control" id="photo" name="photo" accept="image/*" onchange="previewImage(this, 'photoPreview')" />
+                <div class="form-text">
+                  <i class="fas fa-info-circle me-1"></i>
+                  Chọn ảnh rõ mặt để hệ thống nhận diện tốt hơn
+                </div>
+              </div>
+            </div>
+
+            <!-- Student Information -->
+            <div class="col-md-8">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="student_id" class="form-label"> MSSV <span class="text-danger">*</span> </label>
+                    <input type="text" class="form-control" id="student_id" name="student_id" placeholder="Ví dụ: SV001" required />
+                    <div class="form-text">Mã số sinh viên phải là duy nhất</div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="full_name" class="form-label"> Họ và tên <span class="text-danger">*</span> </label>
+                    <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Ví dụ: Nguyễn Văn A" required />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="class_id" class="form-label"> Lớp học <span class="text-danger">*</span> </label>
+                <select class="form-select" id="class_id" name="class_id" required>
+                  <option value="">-- Chọn lớp học --</option>
+                  {% for class in classes %}
+                  <option value="{{ class.id }}">{{ class.class_code }} - {{ class.class_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="alert alert-info">
+                <h6><i class="fas fa-lightbulb me-2"></i>Lưu ý quan trọng:</h6>
+                <ul class="mb-0">
+                  <li>Ảnh nên có khuôn mặt rõ ràng, không bị che khuất</li>
+                  <li>Ánh sáng đủ, không quá tối hoặc quá sáng</li>
+                  <li>Khuôn mặt hướng thẳng về phía camera</li>
+                  <li>Định dạng: JPG, PNG, GIF (tối đa 16MB)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-end">
+            <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save me-2"></i>Lưu sinh viên</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  function previewImage(input, previewId) {
+    const file = input.files[0];
+    const preview = document.getElementById(previewId);
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        preview.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+</script>
+{% endblock %}

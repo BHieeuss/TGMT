@@ -1,0 +1,46 @@
+{% extends "base.html" %} {% block title %}Thêm lớp học{% endblock %} {% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+  <h1 class="h2"><i class="fas fa-plus-circle me-2"></i>Thêm lớp học mới</h1>
+  <div class="btn-toolbar mb-2 mb-md-0">
+    <a href="{{ url_for('classes.list_classes') }}" class="btn btn-outline-secondary"> <i class="fas fa-arrow-left me-1"></i>Quay lại </a>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-school me-2"></i>Thông tin lớp học</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" data-validate>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="class_code" class="form-label"> Mã lớp <span class="text-danger">*</span> </label>
+                <input type="text" class="form-control" id="class_code" name="class_code" placeholder="Ví dụ: CNTT01" required />
+                <div class="form-text">Mã lớp phải là duy nhất</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="class_name" class="form-label"> Tên lớp <span class="text-danger">*</span> </label>
+                <input type="text" class="form-control" id="class_name" name="class_name" placeholder="Ví dụ: Công nghệ thông tin 01" required />
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="description" class="form-label">Mô tả</label>
+            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Mô tả về lớp học (tùy chọn)"></textarea>
+          </div>
+
+          <div class="text-end">
+            <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save me-2"></i>Lưu lớp học</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

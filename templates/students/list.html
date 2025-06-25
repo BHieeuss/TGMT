@@ -1,0 +1,121 @@
+{% extends "base.html" %} {% block title %}Danh sách sinh viên{% endblock %} {% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+  <h1 class="h2"><i class="fas fa-user-graduate me-2"></i>Quản lý sinh viên</h1>
+  <div class="btn-toolbar mb-2 mb-md-0">
+    <a href="{{ url_for('students.add_student') }}" class="btn btn-primary"> <i class="fas fa-plus me-1"></i>Thêm sinh viên </a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Danh sách sinh viên</h5>
+      </div>
+      <div class="card-body">
+        {% if students %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Ảnh</th>
+                <th>MSSV</th>
+                <th>Họ tên</th>
+                <th>Lớp</th>
+                <th>Trạng thái</th>
+                <th>Ngày tạo</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for student in students %}
+              <tr>
+                <td>
+                  {% if student.photo_path %}
+                  <img src="{{ url_for('static', filename='../uploads/' + student.photo_path.split('/')[-1]) }}" alt="Avatar" class="rounded-circle" width="40" height="40" style="object-fit: cover" />
+                  {% else %}
+                  <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px">
+                    <i class="fas fa-user text-white"></i>
+                  </div>
+                  {% endif %}
+                </td>
+                <td><strong>{{ student.student_id }}</strong></td>
+                <td>{{ student.full_name }}</td>
+                <td>
+                  <span class="badge bg-info">{{ student.class_code }}</span>
+                  <br /><small class="text-muted">{{ student.class_name }}</small>
+                </td>
+                <td>
+                  {% if student.face_encoding %}
+                  <span class="badge bg-success"> <i class="fas fa-check me-1"></i>Đã training </span>
+                  {% else %}
+                  <span class="badge bg-warning"> <i class="fas fa-exclamation me-1"></i>Chưa training </span>
+                  {% endif %}
+                </td>
+                <td>{{ student.created_at.split(' ')[0] if student.created_at else '-' }}</td>
+                <td>
+                  <div class="btn-group btn-group-sm" role="group">
+                    <a href="{{ url_for('students.edit_student', student_id=student.id) }}" class="btn btn-outline-primary" title="Sửa">
+                      <i class="fas fa-edit"></i>
+                    </a>
+                    <button type="button" class="btn btn-outline-danger" onclick="deleteStudent({{ student.id }}, `{{ student.full_name|replace('`', '\\`') }}`)" title="Xóa">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+          <i class="fas fa-user-graduate fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">Chưa có sinh viên nào</h5>
+          <p class="text-muted">Hãy thêm sinh viên đầu tiên để bắt đầu</p>
+          <a href="{{ url_for('students.add_student') }}" class="btn btn-primary"> <i class="fas fa-plus me-1"></i>Thêm sinh viên </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+          Xác nhận xóa
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Bạn có chắc chắn muốn xóa sinh viên <strong id="deleteStudentName"></strong>?</p>
+        <p class="text-muted small">
+          <i class="fas fa-info-circle me-1"></i>
+          Thao tác này sẽ xóa toàn bộ dữ liệu sinh viên và không thể hoàn tác.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <form id="deleteForm" method="POST" style="display: inline">
+          <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Xóa</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  function deleteStudent(studentId, studentName) {
+    document.getElementById("deleteStudentName").textContent = studentName;
+    document.getElementById("deleteForm").action = `/students/delete/${studentId}`;
+
+    const modal = new bootstrap.Modal(document.getElementById("deleteModal"));
+    modal.show();
+  }
+</script>
+{% endblock %}

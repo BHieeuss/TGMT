@@ -1,0 +1,104 @@
+{% extends "base.html" %} {% block title %}Danh sách lớp học{% endblock %} {% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+  <h1 class="h2"><i class="fas fa-school me-2"></i>Quản lý lớp học</h1>
+  <div class="btn-toolbar mb-2 mb-md-0">
+    <a href="{{ url_for('classes.add_class') }}" class="btn btn-primary"> <i class="fas fa-plus me-1"></i>Thêm lớp học </a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Danh sách lớp học</h5>
+      </div>
+      <div class="card-body">
+        {% if classes %}
+        <div class="table-responsive">
+          <table class="table table-hover" id="classesTable" data-enhance>
+            <thead>
+              <tr>
+                <th data-sort="class_code">Mã lớp</th>
+                <th data-sort="class_name">Tên lớp</th>
+                <th data-sort="description">Mô tả</th>
+                <th data-sort="student_count">Sĩ số</th>
+                <th data-sort="created_at">Ngày tạo</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for class in classes %}
+              <tr>
+                <td><strong>{{ class.class_code }}</strong></td>
+                <td>{{ class.class_name }}</td>
+                <td>{{ class.description or '-' }}</td>
+                <td>
+                  <span class="badge bg-primary">{{ class.student_count }} SV</span>
+                </td>
+                <td>{{ class.created_at.split(' ')[0] if class.created_at else '-' }}</td>
+                <td>
+                  <div class="btn-group btn-group-sm" role="group">
+                    <a href="{{ url_for('classes.edit_class', class_id=class.id) }}" class="btn btn-outline-primary" title="Sửa">
+                      <i class="fas fa-edit"></i>
+                    </a>
+                    <button type="button" class="btn btn-outline-danger" onclick="deleteClass({{ class.id }}, '{{ class.class_name }}')" title="Xóa">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+          <i class="fas fa-school fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">Chưa có lớp học nào</h5>
+          <p class="text-muted">Hãy thêm lớp học đầu tiên để bắt đầu</p>
+          <a href="{{ url_for('classes.add_class') }}" class="btn btn-primary"> <i class="fas fa-plus me-1"></i>Thêm lớp học </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+          Xác nhận xóa
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Bạn có chắc chắn muốn xóa lớp học <strong id="deleteClassName"></strong>?</p>
+        <p class="text-muted small">
+          <i class="fas fa-info-circle me-1"></i>
+          Lưu ý: Không thể xóa lớp học đã có sinh viên.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <form id="deleteForm" method="POST" style="display: inline">
+          <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Xóa</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  function deleteClass(classId, className) {
+    document.getElementById("deleteClassName").textContent = className;
+    document.getElementById("deleteForm").action = `/classes/delete/${classId}`;
+
+    const modal = new bootstrap.Modal(document.getElementById("deleteModal"));
+    modal.show();
+  }
+</script>
+{% endblock %}

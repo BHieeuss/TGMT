@@ -1,0 +1,319 @@
+{% extends "base.html" %} {% block title %}Chi tiết ca điểm danh{% endblock %} {% block head %}
+<style>
+  .session-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 30px;
+  }
+
+  .attendance-table {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+
+  .table th {
+    background: #f8f9fa;
+    border: none;
+    font-weight: 600;
+    color: #495057;
+  }
+
+  .status-present {
+    background: #d4edda;
+    color: #155724;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.85em;
+    font-weight: 500;
+  }
+
+  .status-absent {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.85em;
+    font-weight: 500;
+  }
+
+  .method-badge {
+    font-size: 0.8em;
+    padding: 3px 8px;
+    border-radius: 10px;
+  }
+
+  .method-face {
+    background: #cce5ff;
+    color: #004085;
+  }
+
+  .method-manual {
+    background: #fff3cd;
+    color: #856404;
+  }
+
+  .student-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .stats-cards {
+    margin-bottom: 30px;
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    height: 100%;
+  }
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  .stat-label {
+    color: #6c757d;
+    font-weight: 500;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="container-fluid py-4">
+  <!-- Session Info Header -->
+  <div class="session-info">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <h2 class="mb-2">{{ session.session_name }}</h2>
+        <p class="mb-2 opacity-75">
+          <i class="fas fa-book me-2"></i>
+          {{ session.subject_name }} ({{ session.subject_code }})
+        </p>
+        <p class="mb-0 opacity-75">
+          <i class="fas fa-users me-2"></i>
+          {{ session.class_name }} ({{ session.class_code }})
+        </p>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <p class="mb-1">
+          <i class="fas fa-calendar me-2"></i>
+          {{ session.session_date }}
+        </p>
+        <p class="mb-0">
+          <i class="fas fa-clock me-2"></i>
+          {{ session.start_time }} {% if session.end_time %} - {{ session.end_time }}{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics -->
+  <div class="stats-cards">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="stat-value text-primary">{{ students_attendance|selectattr("status", "equalto", "present")|list|length }}</div>
+          <div class="stat-label">Có mặt</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="stat-value text-danger">{{ students_attendance|rejectattr("status")|list|length }}</div>
+          <div class="stat-label">Vắng mặt</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="stat-value text-info">{{ students_attendance|length }}</div>
+          <div class="stat-label">Tổng sinh viên</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="stat-value text-success">
+            {% set present_count = students_attendance|selectattr("status", "equalto", "present")|list|length %} {% set total_count = students_attendance|length %} {% if total_count > 0 %} {{ "%.1f"|format((present_count / total_count * 100)) }}% {% else %} 0% {% endif %}
+          </div>
+          <div class="stat-label">Tỷ lệ có mặt</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('attendance.list_sessions') }}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-1"></i>
+          Quay lại
+        </a>
+        <a href="{{ url_for('attendance.face_recognition_page', session_id=session.id) }}" class="btn btn-success">
+          <i class="fas fa-camera me-1"></i>
+          Điểm danh bằng camera
+        </a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#manualAttendanceModal">
+          <i class="fas fa-edit me-1"></i>
+          Điểm danh thủ công
+        </button>
+        <button class="btn btn-info" onclick="exportAttendance()">
+          <i class="fas fa-download me-1"></i>
+          Xuất Excel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance Table -->
+  <div class="attendance-table">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>STT</th>
+            <th>Ảnh</th>
+            <th>MSSV</th>
+            <th>Họ tên</th>
+            <th>Trạng thái</th>
+            <th>Thời gian</th>
+            <th>Phương thức</th>
+            <th>Độ tin cậy</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for student in students_attendance %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>
+              {% if student.photo_path %}
+              <img src="{{ url_for('uploaded_file', filename=student.photo_path.split('\\')[-1].split('/')[-1]) }}" class="student-avatar" alt="Avatar" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <div class="student-avatar bg-light d-flex align-items-center justify-content-center" style="display: none">
+                <i class="fas fa-user text-muted"></i>
+              </div>
+              {% else %}
+              <div class="student-avatar bg-light d-flex align-items-center justify-content-center">
+                <i class="fas fa-user text-muted"></i>
+              </div>
+              {% endif %}
+            </td>
+            <td><strong>{{ student.student_id }}</strong></td>
+            <td>{{ student.full_name }}</td>
+            <td>
+              {% if student.status == 'present' %}
+              <span class="status-present">Có mặt</span>
+              {% else %}
+              <span class="status-absent">Vắng</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if student.attendance_time %} {{ student.attendance_time.strftime('%H:%M:%S') }} {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if student.method %}
+              <span class="method-badge method-{{ student.method }}">
+                {% if student.method == 'face_recognition' %}
+                <i class="fas fa-camera me-1"></i>Camera {% elif student.method == 'manual' %} <i class="fas fa-edit me-1"></i>Thủ công {% endif %}
+              </span>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if student.confidence %}
+              <span class="badge bg-info">{{ "%.1f"|format(student.confidence) }}%</span>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Attendance Modal -->
+<div class="modal fade" id="manualAttendanceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-edit me-2"></i>
+          Điểm danh thủ công
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="manualAttendanceForm">
+          <div class="mb-3">
+            <label class="form-label">MSSV sinh viên *</label>
+            <input type="text" class="form-control" id="studentIdInput" placeholder="Nhập MSSV..." required />
+          </div>
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Nhập MSSV của sinh viên cần điểm danh thủ công
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <button type="button" class="btn btn-primary" onclick="submitManualAttendance()">
+          <i class="fas fa-check me-1"></i>
+          Điểm danh
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SESSION_ID = {{ session.id }};
+
+  function submitManualAttendance() {
+      const studentId = document.getElementById('studentIdInput').value.trim();
+
+      if (!studentId) {
+          alert('Vui lòng nhập MSSV!');
+          return;
+      }
+
+      fetch('/attendance/api/manual_attendance', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+              session_id: SESSION_ID,
+              student_id: studentId
+          })
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert(data.message);
+              location.reload();
+          } else {
+              alert('Lỗi: ' + data.message);
+          }
+      })
+      .catch(error => {
+          alert('Có lỗi xảy ra: ' + error);
+      });
+  }
+
+  function exportAttendance() {
+      window.open('/reports/export_attendance?session_id=' + SESSION_ID, '_blank');
+  }
+</script>
+{% endblock %}

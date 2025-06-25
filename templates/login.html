@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng nhập - Hệ thống điểm danh khuôn mặt</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+
+    <style>
+      body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .login-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+      }
+      .login-header {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border-radius: 20px 20px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+          <div class="card login-card">
+            <div class="card-header login-header text-center py-4">
+              <h3 class="mb-0">
+                <i class="fas fa-user-check fa-2x mb-3"></i>
+                <br />Hệ thống điểm danh
+              </h3>
+              <p class="mb-0">Nhận diện khuôn mặt</p>
+            </div>
+
+            <div class="card-body p-5">
+              <!-- Flash Messages -->
+              {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category, message in messages %}
+              <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+              {% endfor %} {% endif %} {% endwith %}
+
+              <form method="POST">
+                <div class="mb-3">
+                  <label for="username" class="form-label"> <i class="fas fa-user me-2"></i>Tên đăng nhập </label>
+                  <input type="text" class="form-control" id="username" name="username" placeholder="Nhập tên đăng nhập" required />
+                </div>
+
+                <div class="mb-4">
+                  <label for="password" class="form-label"> <i class="fas fa-lock me-2"></i>Mật khẩu </label>
+                  <input type="password" class="form-control" id="password" name="password" placeholder="Nhập mật khẩu" required />
+                </div>
+
+                <div class="d-grid">
+                  <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-sign-in-alt me-2"></i>Đăng nhập</button>
+                </div>
+              </form>
+
+              <div class="text-center mt-4">
+                <small class="text-muted">
+                  <i class="fas fa-info-circle me-1"></i>
+                  Demo: admin / admin123
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
