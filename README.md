@@ -1,6 +1,12 @@
+# TGMT
+
 # 🎯 Hệ thống Điểm danh Khuôn mặt
 
-Một ứng dụng web hiện đại sử dụng công nghệ nhận diện khuôn mặt để điểm danh sinh viên tự động.
+Môn học: **Thị Giác Máy Tính**
+Lớp: **DA21TTA**
+Chuyên ngành: **Công nghệ thông tin**
+Giảng viên: **Đoàn Phước Miền**
+Nhóm Thực hiện: **Trần Bá Hiếu** **Sĩ Chí Thiện** **Phan Minh Thứ**
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![Flask](https://img.shields.io/badge/Flask-2.3+-green.svg)
@@ -178,53 +184,3 @@ face-attendance-system/
 1. Vào "Báo cáo > Báo cáo điểm danh"
 2. Chọn bộ lọc (lớp, môn, ngày)
 3. Xem hoặc xuất Excel
-
-## 🔧 Cấu hình
-
-### Camera Requirements
-
-- Webcam hoặc camera tích hợp
-- Độ phân giải tối thiểu: 640x480
-- Hỗ trợ WebRTC
-
-### Browser Support
-
-- Chrome 60+
-- Firefox 55+
-- Safari 11+
-- Edge 79+
-
-### Performance Tips
-
-- Sử dụng ảnh chất lượng cao cho training
-- Đảm bảo ánh sáng đủ khi điểm danh
-- Thường xuyên backup database
-
-## 🤝 Contributing
-
-1. Fork project
-2. Tạo branch mới (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Tạo Pull Request
-
-## 📝 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
-## 📞 Liên hệ
-
-- 📧 Email: your-email@example.com
-- 🌐 Website: https://your-website.com
-- 📱 Phone: +84 XXX XXX XXX
-
-## 🙏 Acknowledgments
-
-- [face_recognition](https://github.com/ageitgey/face_recognition) - Amazing face recognition library
-- [OpenCV](https://opencv.org/) - Computer vision library
-- [Flask](https://flask.palletsprojects.com/) - Web framework
-- [Bootstrap](https://getbootstrap.com/) - CSS framework
-
----
-
-⭐ **Star this repo if you find it helpful!** ⭐
