@@ -1,0 +1,372 @@
+{% extends "base.html" %} {% block title %}Quản Lý Môn Học{% endblock %} {% block content %}
+<div class="container-fluid py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card bg-gradient-success shadow-lg">
+        <div class="card-body text-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-book-fill fs-1 me-3 text-warning icon-glow"></i>
+              <div>
+                <h2 class="mb-1">
+                  <i class="bi bi-collection me-2"></i>
+                  Quản Lý Môn Học
+                </h2>
+                <p class="mb-0 opacity-8">Thêm, sửa, xóa các môn học trong hệ thống</p>
+              </div>
+            </div>
+            <a href="{{ url_for('subjects.add_subject') }}" class="btn btn-warning btn-lg hover-lift">
+              <i class="bi bi-plus-circle-fill me-2"></i>
+              Thêm Môn Học
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card glass-card text-center">
+        <div class="card-body">
+          <i class="bi bi-book-fill fs-1 text-success mb-2"></i>
+          <h3 class="text-primary">{{ subjects|length }}</h3>
+          <p class="text-muted mb-0">Tổng môn học</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card glass-card text-center">
+        <div class="card-body">
+          <i class="bi bi-calendar-check fs-1 text-info mb-2"></i>
+          <h3 class="text-primary">{{ active_subjects }}</h3>
+          <p class="text-muted mb-0">Môn đang hoạt động</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card glass-card text-center">
+        <div class="card-body">
+          <i class="bi bi-people-fill fs-1 text-warning mb-2"></i>
+          <h3 class="text-primary">{{ total_sessions }}</h3>
+          <p class="text-muted mb-0">Ca điểm danh</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card glass-card text-center">
+        <div class="card-body">
+          <i class="bi bi-graph-up fs-1 text-danger mb-2"></i>
+          <h3 class="text-primary">{{ avg_attendance }}%</h3>
+          <p class="text-muted mb-0">Tỷ lệ điểm danh TB</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search and Filter -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card glass-card">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-md-6">
+              <div class="input-group">
+                <span class="input-group-text bg-primary text-white">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm môn học..." onkeyup="filterSubjects()" />
+              </div>
+            </div>
+            <div class="col-md-6 text-end">
+              <button class="btn btn-outline-primary me-2" onclick="exportToExcel()">
+                <i class="bi bi-file-earmark-excel me-2"></i>
+                Xuất Excel
+              </button>
+              <button class="btn btn-outline-secondary" onclick="printList()">
+                <i class="bi bi-printer me-2"></i>
+                In danh sách
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subjects Table -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card glass-card shadow-lg">
+        <div class="card-header bg-gradient-primary text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-table me-2"></i>
+            Danh Sách Môn Học
+          </h5>
+        </div>
+        <div class="card-body p-0">
+          {% if subjects %}
+          <div class="table-responsive">
+            <table class="table table-hover table-dashboard mb-0" id="subjectsTable">
+              <thead class="table-dark">
+                <tr>
+                  <th class="text-center" style="width: 80px">
+                    <i class="bi bi-hash"></i>
+                  </th>
+                  <th>
+                    <i class="bi bi-code-square me-2"></i>
+                    Mã Môn
+                  </th>
+                  <th>
+                    <i class="bi bi-book me-2"></i>
+                    Tên Môn Học
+                  </th>
+                  <th>
+                    <i class="bi bi-card-text me-2"></i>
+                    Mô Tả
+                  </th>
+                  <th class="text-center">
+                    <i class="bi bi-calendar-event me-2"></i>
+                    Ca Điểm Danh
+                  </th>
+                  <th class="text-center">
+                    <i class="bi bi-clock me-2"></i>
+                    Ngày Tạo
+                  </th>
+                  <th class="text-center" style="width: 150px">
+                    <i class="bi bi-gear me-2"></i>
+                    Thao Tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for subject in subjects %}
+                <tr class="subject-row">
+                  <td class="text-center">
+                    <div class="d-flex align-items-center justify-content-center">
+                      <div class="avatar-sm bg-gradient-success text-white rounded-circle d-flex align-items-center justify-content-center">{{ loop.index }}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-mortarboard-fill text-primary me-2"></i>
+                      <strong class="text-primary">{{ subject.subject_code }}</strong>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="subject-name">
+                      <h6 class="mb-1">{{ subject.subject_name }}</h6>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="text-muted">
+                      {% if subject.description %} {{ subject.description[:50] }}{% if subject.description|length > 50 %}...{% endif %} {% else %}
+                      <em>Chưa có mô tả</em>
+                      {% endif %}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    <span class="badge badge-info badge-lg">
+                      <i class="bi bi-calendar-check me-1"></i>
+                      {{ subject.session_count or 0 }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    <small class="text-muted">
+                      <i class="bi bi-calendar me-1"></i>
+                      {% if subject.created_at %} {{ subject.created_at[:10] if subject.created_at else 'N/A' }} {% else %} N/A {% endif %}
+                    </small>
+                  </td>
+                  <td class="text-center">
+                    <div class="btn-group" role="group">
+                      <a href="{{ url_for('subjects.edit_subject', subject_id=subject.id) }}" class="btn btn-sm btn-outline-primary" title="Chỉnh sửa">
+                        <i class="bi bi-pencil-square"></i>
+                      </a>
+                      <button class="btn btn-sm btn-outline-info" onclick="viewSubjectDetails({{ subject.id }})" title="Xem chi tiết">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" onclick="deleteSubject({{ subject.id }}, '{{ subject.subject_name }}')" title="Xóa">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="empty-state py-5">
+            <div class="text-center">
+              <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+              <h4 class="text-muted">Chưa có môn học nào</h4>
+              <p class="text-muted mb-4">Hãy thêm môn học đầu tiên để bắt đầu sử dụng hệ thống</p>
+              <a href="{{ url_for('subjects.add_subject') }}" class="btn btn-primary btn-lg">
+                <i class="bi bi-plus-circle-fill me-2"></i>
+                Thêm Môn Học Đầu Tiên
+              </a>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content glass-card">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          Xác Nhận Xóa
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Bạn có chắc chắn muốn xóa môn học <strong id="subjectName"></strong>?</p>
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <strong>Cảnh báo:</strong> Hành động này không thể hoàn tác!
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-2"></i>
+          Hủy
+        </button>
+        <form method="POST" id="deleteForm" style="display: inline">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash me-2"></i>
+            Xóa Môn Học
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Subject Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content glass-card">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-info-circle-fill me-2"></i>
+          Chi Tiết Môn Học
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="subjectDetails">
+        <!-- Content will be loaded here -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-2"></i>
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Filter subjects
+  function filterSubjects() {
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById("subjectsTable");
+    const rows = table.getElementsByTagName("tr");
+
+    for (let i = 1; i < rows.length; i++) {
+      const cells = rows[i].getElementsByTagName("td");
+      let found = false;
+
+      for (let j = 0; j < cells.length; j++) {
+        const text = cells[j].textContent || cells[j].innerText;
+        if (text.toUpperCase().indexOf(filter) > -1) {
+          found = true;
+          break;
+        }
+      }
+
+      rows[i].style.display = found ? "" : "none";
+    }
+  }
+
+  // Delete subject
+  function deleteSubject(subjectId, subjectName) {
+    document.getElementById("subjectName").textContent = subjectName;
+    document.getElementById("deleteForm").action = `/subjects/delete/${subjectId}`;
+
+    const modal = new bootstrap.Modal(document.getElementById("deleteModal"));
+    modal.show();
+  }
+
+  // View subject details
+  function viewSubjectDetails(subjectId) {
+    // Load subject details via AJAX
+    fetch(`/subjects/api/details/${subjectId}`)
+      .then((response) => response.json())
+      .then((data) => {
+        const content = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">Thông Tin Cơ Bản</h6>
+                        <table class="table table-borderless">
+                            <tr><td><strong>Mã môn:</strong></td><td>${data.subject_code}</td></tr>
+                            <tr><td><strong>Tên môn:</strong></td><td>${data.subject_name}</td></tr>
+                            <tr><td><strong>Mô tả:</strong></td><td>${data.description || "Chưa có"}</td></tr>
+                            <tr><td><strong>Ngày tạo:</strong></td><td>${new Date(data.created_at).toLocaleDateString("vi-VN")}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-success">Thống Kê</h6>
+                        <table class="table table-borderless">
+                            <tr><td><strong>Số ca điểm danh:</strong></td><td><span class="badge bg-info">${data.session_count}</span></td></tr>
+                            <tr><td><strong>Tổng lượt điểm danh:</strong></td><td><span class="badge bg-success">${data.total_attendance}</span></td></tr>
+                            <tr><td><strong>Tỷ lệ điểm danh TB:</strong></td><td><span class="badge bg-warning">${data.avg_attendance}%</span></td></tr>
+                        </table>
+                    </div>
+                </div>
+            `;
+        document.getElementById("subjectDetails").innerHTML = content;
+        const modal = new bootstrap.Modal(document.getElementById("detailsModal"));
+        modal.show();
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        alert("Không thể tải thông tin môn học!");
+      });
+  }
+
+  // Export to Excel
+  function exportToExcel() {
+    // Implementation for Excel export
+    window.location.href = "/subjects/export/excel";
+  }
+
+  // Print list
+  function printList() {
+    window.print();
+  }
+</script>
+
+<style>
+  @media print {
+    .btn,
+    .modal,
+    .card-header {
+      display: none !important;
+    }
+    .card {
+      border: none !important;
+      box-shadow: none !important;
+    }
+  }
+</style>
+{% endblock %}

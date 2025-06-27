@@ -1,0 +1,77 @@
+{% extends "base.html" %} {% block title %}AI Settings - Cài đặt Model{% endblock %} {% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-secondary text-white">
+          <h4 class="mb-0">
+            <i class="fas fa-cog"></i>
+            AI Settings - Cài đặt Model
+          </h4>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h5>Thông tin Model hiện tại</h5>
+              {% if model_info.success %}
+              <table class="table table-sm">
+                <tr>
+                  <td><strong>Trạng thái:</strong></td>
+                  <td>
+                    {% if model_info.is_trained %}
+                    <span class="badge badge-success">Đã train</span>
+                    {% else %}
+                    <span class="badge badge-warning">Chưa train</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Số sinh viên:</strong></td>
+                  <td>{{ model_info.student_count }}</td>
+                </tr>
+                <tr>
+                  <td><strong>Kích thước ảnh:</strong></td>
+                  <td>{{ model_info.image_size[0] }}x{{ model_info.image_size[1] }}</td>
+                </tr>
+                <tr>
+                  <td><strong>Confidence threshold:</strong></td>
+                  <td>{{ (model_info.confidence_threshold * 100)|round(1) }}%</td>
+                </tr>
+                <tr>
+                  <td><strong>Ensemble threshold:</strong></td>
+                  <td>{{ (model_info.ensemble_threshold * 100)|round(1) }}%</td>
+                </tr>
+              </table>
+              {% else %}
+              <div class="alert alert-warning">Model chưa được train hoặc có lỗi</div>
+              {% endif %}
+            </div>
+
+            <div class="col-md-6">
+              <h5>Thao tác</h5>
+              <div class="list-group">
+                <a href="{{ url_for('ai.dashboard') }}" class="list-group-item list-group-item-action">
+                  <i class="fas fa-tachometer-alt me-2"></i>
+                  Về Dashboard
+                </a>
+                <a href="{{ url_for('ai.test_accuracy') }}" class="list-group-item list-group-item-action">
+                  <i class="fas fa-chart-line me-2"></i>
+                  Test Accuracy
+                </a>
+                <a href="{{ url_for('ai.debug_model') }}" class="list-group-item list-group-item-action">
+                  <i class="fas fa-bug me-2"></i>
+                  Debug Model
+                </a>
+                <a href="{{ url_for('ai.test') }}" class="list-group-item list-group-item-action">
+                  <i class="fas fa-vial me-2"></i>
+                  Test Nhận diện
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

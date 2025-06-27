@@ -1,163 +1,195 @@
 {% extends "base.html" %} {% block title %}Dashboard - Hệ thống điểm danh khuôn mặt{% endblock %} {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-  <h1 class="h2"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h1>
-  <div class="btn-toolbar mb-2 mb-md-0">
-    <div class="btn-group me-2">
-      <a href="{{ url_for('camera') }}" class="btn btn-sm btn-success"> <i class="fas fa-camera me-1"></i>Điểm danh ngay </a>
+<div class="container-fluid px-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-4 pb-3 mb-5">
+    <h1 class="h2 text-gradient fade-in mb-0"><i class="bi bi-speedometer2 icon-dashboard me-3"></i>Dashboard</h1>
+    <div class="btn-toolbar">
+      <a href="{{ url_for('camera') }}" class="btn btn-success btn-lg shadow-medium hover-lift px-4"> <i class="bi bi-camera-fill icon-camera me-2"></i>Điểm danh ngay </a>
     </div>
   </div>
-</div>
 
-<!-- Statistics Cards -->
-<div class="row mb-4">
-  <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-primary shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Tổng số lớp học</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.total_classes }}</div>
-          </div>
-          <div class="col-auto">
-            <i class="fas fa-school fa-2x text-gray-300"></i>
+  <!-- Statistics Cards -->
+  <div class="row mb-5 g-4">
+    <div class="col-xl-3 col-md-6">
+      <div class="card glass-card border-left-primary shadow-strong h-100 hover-lift scale-in">
+        <div class="card-body p-4">
+          <div class="row no-gutters align-items-center">
+            <div class="col-8">
+              <div class="text-xs font-weight-bold text-primary text-uppercase mb-3 ls-1">Tổng số lớp học</div>
+              <div class="h2 mb-0 font-weight-bold text-gradient">{{ stats.total_classes }}</div>
+            </div>
+            <div class="col-4 text-end">
+              <i class="bi bi-building icon-school" style="font-size: 3.5rem; opacity: 0.7"></i>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-success shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Tổng sinh viên</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.total_students }}</div>
-          </div>
-          <div class="col-auto">
-            <i class="fas fa-user-graduate fa-2x text-gray-300"></i>
+    <div class="col-xl-3 col-md-6">
+      <div class="card glass-card border-left-success shadow-strong h-100 hover-lift scale-in" style="animation-delay: 0.1s">
+        <div class="card-body p-4">
+          <div class="row no-gutters align-items-center">
+            <div class="col-8">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-3 ls-1">Tổng sinh viên</div>
+              <div class="h2 mb-0 font-weight-bold text-gradient">{{ stats.total_students }}</div>
+            </div>
+            <div class="col-4 text-end">
+              <i class="bi bi-mortarboard-fill icon-student" style="font-size: 3.5rem; opacity: 0.7"></i>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-info shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Tổng môn học</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.total_subjects }}</div>
-          </div>
-          <div class="col-auto">
-            <i class="fas fa-book fa-2x text-gray-300"></i>
+    <div class="col-xl-3 col-md-6">
+      <div class="card glass-card border-left-info shadow-strong h-100 hover-lift scale-in" style="animation-delay: 0.2s">
+        <div class="card-body p-4">
+          <div class="row no-gutters align-items-center">
+            <div class="col-8">
+              <div class="text-xs font-weight-bold text-info text-uppercase mb-3 ls-1">Tổng môn học</div>
+              <div class="h2 mb-0 font-weight-bold text-gradient">{{ stats.total_subjects }}</div>
+            </div>
+            <div class="col-4 text-end">
+              <i class="bi bi-book-fill icon-book" style="font-size: 3.5rem; opacity: 0.7"></i>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-warning shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Ca điểm danh hôm nay</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.today_sessions }}</div>
-          </div>
-          <div class="col-auto">
-            <i class="fas fa-calendar-check fa-2x text-gray-300"></i>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Quick Actions -->
-<div class="row mb-4">
-  <div class="col-12">
-    <div class="card shadow">
-      <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-bolt me-2"></i>Thao tác nhanh</h6>
-      </div>
-      <div class="card-body">
-        <div class="row">
-          <div class="col-md-3 mb-3">
-            <a href="{{ url_for('classes.add_class') }}" class="btn btn-outline-primary btn-lg w-100">
-              <i class="fas fa-plus-circle fa-2x mb-2"></i>
-              <br />Thêm lớp học
-            </a>
-          </div>
-          <div class="col-md-3 mb-3">
-            <a href="{{ url_for('students.add_student') }}" class="btn btn-outline-success btn-lg w-100">
-              <i class="fas fa-user-plus fa-2x mb-2"></i>
-              <br />Thêm sinh viên
-            </a>
-          </div>
-          <div class="col-md-3 mb-3">
-            <a href="{{ url_for('attendance.add_session') }}" class="btn btn-outline-warning btn-lg w-100">
-              <i class="fas fa-calendar-plus fa-2x mb-2"></i>
-              <br />Tạo ca điểm danh
-            </a>
-          </div>
-          <div class="col-md-3 mb-3">
-            <a href="{{ url_for('camera') }}" class="btn btn-outline-danger btn-lg w-100">
-              <i class="fas fa-camera fa-2x mb-2"></i>
-              <br />Điểm danh ngay
-            </a>
+    <div class="col-xl-3 col-md-6">
+      <div class="card glass-card border-left-warning shadow-strong h-100 hover-lift scale-in" style="animation-delay: 0.3s">
+        <div class="card-body p-4">
+          <div class="row no-gutters align-items-center">
+            <div class="col-8">
+              <div class="text-xs font-weight-bold text-warning text-uppercase mb-3 ls-1">Ca điểm danh hôm nay</div>
+              <div class="h2 mb-0 font-weight-bold text-gradient">{{ stats.today_sessions }}</div>
+            </div>
+            <div class="col-4 text-end">
+              <i class="bi bi-calendar-check-fill icon-attendance" style="font-size: 3.5rem; opacity: 0.7"></i>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Recent Attendance -->
-<div class="row">
-  <div class="col-12">
-    <div class="card shadow">
-      <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-history me-2"></i>Điểm danh gần đây</h6>
+  <!-- Quick Actions -->
+  <div class="row mb-5">
+    <div class="col-12">
+      <div class="card glass-card shadow-strong slide-up">
+        <div class="card-header bg-gradient-primary text-white py-4">
+          <h4 class="m-0 font-weight-bold"><i class="bi bi-lightning-fill me-3" style="font-size: 1.8rem"></i>Thao tác nhanh</h4>
+        </div>
+        <div class="card-body p-5">
+          <div class="row g-4">
+            <div class="col-lg-3 col-md-6">
+              <a href="{{ url_for('classes.add_class') }}" class="btn btn-outline-primary btn-lg w-100 h-100 d-flex flex-column align-items-center justify-content-center hover-lift shadow-medium" style="min-height: 160px; border-width: 2px; border-radius: 20px">
+                <i class="bi bi-plus-circle-fill icon-plus mb-3" style="font-size: 3.5rem"></i>
+                <span class="fw-bold fs-5">Thêm lớp học</span>
+              </a>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <a href="{{ url_for('students.add_student') }}" class="btn btn-outline-success btn-lg w-100 h-100 d-flex flex-column align-items-center justify-content-center hover-lift shadow-medium" style="min-height: 160px; border-width: 2px; border-radius: 20px">
+                <i class="bi bi-person-plus-fill icon-student mb-3" style="font-size: 3.5rem"></i>
+                <span class="fw-bold fs-5">Thêm sinh viên</span>
+              </a>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <a href="{{ url_for('attendance.add_session') }}" class="btn btn-outline-warning btn-lg w-100 h-100 d-flex flex-column align-items-center justify-content-center hover-lift shadow-medium" style="min-height: 160px; border-width: 2px; border-radius: 20px">
+                <i class="bi bi-calendar-plus-fill icon-attendance mb-3" style="font-size: 3.5rem"></i>
+                <span class="fw-bold fs-5">Tạo ca điểm danh</span>
+              </a>
+            </div>
+            <div class="col-lg-3 col-md-6">
+              <a href="{{ url_for('camera') }}" class="btn btn-outline-danger btn-lg w-100 h-100 d-flex flex-column align-items-center justify-content-center hover-lift shadow-medium" style="min-height: 160px; border-width: 2px; border-radius: 20px">
+                <i class="bi bi-camera-fill icon-camera mb-3" style="font-size: 3.5rem"></i>
+                <span class="fw-bold fs-5">Điểm danh ngay</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="card-body">
-        {% if stats.recent_attendance %}
-        <div class="table-responsive">
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Thời gian</th>
-                <th>MSSV</th>
-                <th>Họ tên</th>
-                <th>Lớp</th>
-                <th>Môn học</th>
-                <th>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for record in stats.recent_attendance %}
-              <tr>
-                <td>{{ record.attendance_time }}</td>
-                <td>{{ record.student_id }}</td>
-                <td>{{ record.full_name }}</td>
-                <td>{{ record.class_name }}</td>
-                <td>{{ record.subject_name }}</td>
-                <td>
-                  <span class="badge bg-success">{{ record.status }}</span>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+    </div>
+  </div>
+
+  <!-- Recent Attendance -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card glass-card shadow-strong fade-in">
+        <div class="card-header bg-gradient-primary text-white py-4">
+          <h4 class="m-0 font-weight-bold"><i class="bi bi-clock-history me-3" style="font-size: 1.8rem"></i>Điểm danh gần đây</h4>
         </div>
-        {% else %}
-        <div class="text-center py-4">
-          <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-          <p class="text-muted">Chưa có lịch sử điểm danh</p>
-          <a href="{{ url_for('camera') }}" class="btn btn-primary"> <i class="fas fa-camera me-1"></i>Bắt đầu điểm danh </a>
+        <div class="card-body p-0">
+          {% if stats.recent_attendance %}
+          <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 1rem">
+              <thead style="background-color: #f8f9fa">
+                <tr>
+                  <th class="px-4 py-4 border-0">
+                    <i class="bi bi-clock icon-chart me-2"></i>
+                    <strong>Thời gian</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0">
+                    <i class="bi bi-person-badge icon-student me-2"></i>
+                    <strong>MSSV</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0">
+                    <i class="bi bi-person icon-student me-2"></i>
+                    <strong>Họ tên</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0">
+                    <i class="bi bi-building icon-school me-2"></i>
+                    <strong>Lớp</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0">
+                    <i class="bi bi-book icon-book me-2"></i>
+                    <strong>Môn học</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0 text-center">
+                    <i class="bi bi-check-circle icon-plus me-2"></i>
+                    <strong>Trạng thái</strong>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for record in stats.recent_attendance %}
+                <tr style="border-bottom: 1px solid #e9ecef">
+                  <td class="px-4 py-4">
+                    <span class="fw-medium text-dark">{{ record.attendance_time }}</span>
+                  </td>
+                  <td class="px-4 py-4">
+                    <span class="badge bg-light text-dark fw-bold px-3 py-2" style="font-size: 0.9rem"> {{ record.student_id }} </span>
+                  </td>
+                  <td class="px-4 py-4">
+                    <span class="fw-bold text-primary fs-6">{{ record.full_name }}</span>
+                  </td>
+                  <td class="px-4 py-4">
+                    <span class="text-dark">{{ record.class_name }}</span>
+                  </td>
+                  <td class="px-4 py-4">
+                    <span class="text-dark">{{ record.subject_name }}</span>
+                  </td>
+                  <td class="px-4 py-4 text-center">
+                    <span class="badge bg-gradient-success px-3 py-2" style="font-size: 0.9rem"> <i class="bi bi-check-circle-fill me-1"></i>{{ record.status }} </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center py-5 px-4">
+            <div class="mb-4">
+              <i class="bi bi-inbox icon-chart" style="font-size: 5rem; opacity: 0.4"></i>
+            </div>
+            <h4 class="text-muted mb-3 fw-bold">Chưa có lịch sử điểm danh</h4>
+            <p class="text-muted mb-4 fs-5">Bắt đầu điểm danh để xem dữ liệu tại đây</p>
+            <a href="{{ url_for('camera') }}" class="btn btn-primary btn-lg shadow-medium hover-lift px-5 py-3"> <i class="bi bi-camera-fill icon-camera me-2"></i>Bắt đầu điểm danh </a>
+          </div>
+          {% endif %}
         </div>
-        {% endif %}
       </div>
     </div>
   </div>

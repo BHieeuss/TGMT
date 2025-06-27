@@ -1,0 +1,317 @@
+{% extends "base.html" %} {% block title %}AI Management - Quản lý Model Nhận diện{% endblock %} {% block head %}
+<style>
+  .model-stats {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 30px;
+  }
+
+  .stat-item {
+    text-align: center;
+    padding: 15px;
+  }
+
+  .stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+  }
+
+  .student-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: none;
+    border-radius: 10px;
+  }
+
+  .student-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .status-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+  }
+
+  .trained {
+    background: #28a745;
+    color: white;
+  }
+
+  .not-trained {
+    background: #ffc107;
+    color: #212529;
+  }
+
+  .train-btn {
+    width: 100%;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+
+  .train-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .progress-indicator {
+    height: 4px;
+    background: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+  <h1 class="h2">
+    <i class="fas fa-robot me-2"></i>
+    AI Management - Quản lý Model Nhận diện
+  </h1>
+  <div class="btn-toolbar mb-2 mb-md-0">
+    <a href="{{ url_for('ai.test') }}" class="btn btn-outline-primary me-2"> <i class="fas fa-vial me-1"></i>Test Model </a>
+    <a href="{{ url_for('ai.settings') }}" class="btn btn-outline-secondary"> <i class="fas fa-cog me-1"></i>Cài đặt </a>
+  </div>
+</div>
+
+<!-- Model Statistics -->
+<div class="model-stats">
+  <div class="row">
+    <div class="col-md-3">
+      <div class="stat-item">
+        <span class="stat-number">{{ model_info.total_faces }}</span>
+        <span class="stat-label">Sinh viên đã train</span>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-item">
+        <span class="stat-number">{{ student_stats|length }}</span>
+        <span class="stat-label">Tổng sinh viên có ảnh</span>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-item">
+        <span class="stat-number"> {% set trained_count = student_stats|selectattr("is_trained")|list|length %} {{ "%.0f"|format((trained_count / student_stats|length * 100) if student_stats|length > 0 else 0) }}% </span>
+        <span class="stat-label">Tiến độ hoàn thành</span>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-item">
+        <span class="stat-number">
+          <i class="fas fa-{% if model_info.model_exists %}check-circle{% else %}times-circle{% endif %}"></i>
+        </span>
+        <span class="stat-label">Trạng thái Model</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="fas fa-bolt me-2"></i>
+          Thao tác nhanh
+        </h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('ai.train_model') }}" style="display: inline">
+          <button type="submit" class="btn btn-success btn-lg me-3" onclick="return confirm('Bạn có chắc muốn train toàn bộ model? Quá trình này có thể mất vài phút.')">
+            <i class="fas fa-play me-2"></i>
+            Train Toàn bộ Model
+          </button>
+        </form>
+
+        <a href="{{ url_for('ai.test_accuracy') }}" class="btn btn-info btn-lg me-3">
+          <i class="fas fa-chart-line me-2"></i>
+          Test Accuracy
+        </a>
+
+        <a href="{{ url_for('ai.debug_model') }}" class="btn btn-warning btn-lg me-3">
+          <i class="fas fa-bug me-2"></i>
+          Debug Model
+        </a>
+
+        <a href="{{ url_for('attendance.list_sessions') }}" class="btn btn-primary btn-lg">
+          <i class="fas fa-camera me-2"></i>
+          Điểm danh
+        </a>
+
+        <div class="d-inline-block mt-2">
+          <small class="text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            Train toàn bộ model sẽ xử lý tất cả ảnh từ {{ student_stats|length }} sinh viên với thuật toán nâng cao
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Student Training Status -->
+<div class="row">
+  <div class="col-12">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="fas fa-users me-2"></i>
+          Trạng thái Training từng Sinh viên
+        </h5>
+      </div>
+      <div class="card-body">
+        {% if student_stats %}
+        <div class="row">
+          {% for student in student_stats %}
+          <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card student-card h-100 position-relative">
+              <div class="status-badge {{ 'trained' if student.is_trained else 'not-trained' }}">
+                {% if student.is_trained %}
+                <i class="fas fa-check me-1"></i>Đã train {% else %} <i class="fas fa-clock me-1"></i>Chưa train {% endif %}
+              </div>
+
+              <div class="card-body">
+                <h6 class="card-title">{{ student.student_name }}</h6>
+                <p class="card-text text-muted mb-2"><strong>MSSV:</strong> {{ student.student_id }}</p>
+                <p class="card-text">
+                  <i class="fas fa-images me-2"></i>
+                  <strong>{{ student.image_count }}</strong> ảnh đã thu thập
+                </p>
+
+                <!-- Progress Indicator -->
+                <div class="progress-indicator">
+                  <div class="progress-bar" style="width: {{ (student.image_count / 40 * 100) if student.image_count <= 40 else 100 }}%"></div>
+                </div>
+                <small class="text-muted"> {{ student.image_count }}/40 ảnh ({{ "%.0f"|format((student.image_count / 40 * 100) if student.image_count <= 40 else 100) }}%) </small>
+              </div>
+
+              <div class="card-footer bg-transparent">
+                {% if student.image_count > 0 %}
+                <form method="POST" action="{{ url_for('ai.train_student', student_id=student.student_id) }}">
+                  <button type="submit" class="train-btn btn {{ 'btn-warning' if student.is_trained else 'btn-primary' }}" onclick="return confirm('Train model cho sinh viên {{ student.student_name }}?')">
+                    <i class="fas fa-{{ 'sync' if student.is_trained else 'play' }} me-2"></i>
+                    {{ 'Re-train' if student.is_trained else 'Train ngay' }}
+                  </button>
+                </form>
+                {% else %}
+                <button class="train-btn btn btn-secondary" disabled>
+                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  Chưa có ảnh
+                </button>
+                <small class="text-muted d-block mt-2">
+                  <a href="{{ url_for('capture_faces') }}" class="text-decoration-none"> <i class="fas fa-camera me-1"></i>Thu thập ảnh trước </a>
+                </small>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+          <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">Chưa có dữ liệu ảnh nào</h5>
+          <p class="text-muted mb-3">Hãy thu thập ảnh khuôn mặt sinh viên trước khi train model</p>
+          <a href="{{ url_for('capture_faces') }}" class="btn btn-primary"> <i class="fas fa-camera me-2"></i>Bắt đầu thu thập ảnh </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Training Progress Modal (if needed) -->
+<div class="modal fade" id="trainingModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-cog fa-spin me-2"></i>
+          Đang training model...
+        </h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="spinner-border text-primary mb-3" role="status"></div>
+        <p>Vui lòng chờ trong giây lát. Quá trình training có thể mất vài phút tùy thuộc vào số lượng ảnh.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  // Show training modal when training starts
+  document.addEventListener('DOMContentLoaded', function() {
+      const trainButtons = document.querySelectorAll('button[type="submit"]');
+
+      trainButtons.forEach(button => {
+          button.addEventListener('click', function(e) {
+              // Show modal after confirmation
+              if (this.onclick && this.onclick()) {
+                  const modal = new bootstrap.Modal(document.getElementById('trainingModal'));
+                  modal.show();
+              }
+          });
+      });
+
+      // Auto refresh page every 30 seconds if training is in progress
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('training') === 'true') {
+          setTimeout(() => {
+              window.location.reload();
+          }, 30000);
+      }
+  });
+
+  // Show success/error messages with better styling
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  document.addEventListener('DOMContentLoaded', function() {
+      {% for category, message in messages %}
+      showToast('{{ message|safe }}', '{{ category }}');
+      {% endfor %}
+  });
+  {% endif %}
+  {% endwith %}
+
+  function showToast(message, type) {
+      const alertClass = type === 'error' ? 'danger' : type;
+      const toast = document.createElement('div');
+      toast.className = `alert alert-${alertClass} alert-dismissible fade show position-fixed`;
+      toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+      toast.innerHTML = `
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      `;
+
+      document.body.appendChild(toast);
+
+      // Auto remove after 5 seconds
+      setTimeout(() => {
+          if (toast.parentNode) {
+              toast.remove();
+          }
+      }, 5000);
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,301 @@
+{% extends "base.html" %} {% block title %}Debug Model - AI Recognition{% endblock %} {% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-warning text-dark">
+          <h4 class="mb-0">
+            <i class="fas fa-bug"></i>
+            Debug Model Information
+          </h4>
+        </div>
+        <div class="card-body">
+          <!-- Model Status -->
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header">
+                  <h5>Trạng thái Model</h5>
+                </div>
+                <div class="card-body">
+                  {% if debug_info.model_status.success %}
+                  <div class="alert alert-success">
+                    <i class="fas fa-check"></i>
+                    Model đã được train và sẵn sàng
+                  </div>
+
+                  <table class="table table-sm">
+                    <tr>
+                      <td><strong>Số sinh viên:</strong></td>
+                      <td>{{ debug_info.model_status.student_count }}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Kích thước ảnh:</strong></td>
+                      <td>{{ debug_info.model_status.image_size[0] }}x{{ debug_info.model_status.image_size[1] }}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Confidence threshold:</strong></td>
+                      <td>{{ (debug_info.model_status.confidence_threshold * 100)|round(1) }}%</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Ensemble threshold:</strong></td>
+                      <td>{{ (debug_info.model_status.ensemble_threshold * 100)|round(1) }}%</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Model path:</strong></td>
+                      <td><code>{{ debug_info.model_status.model_path }}</code></td>
+                    </tr>
+                  </table>
+                  {% else %}
+                  <div class="alert alert-danger">
+                    <i class="fas fa-times"></i>
+                    {{ debug_info.model_status.message }}
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header">
+                  <h5>Components Status</h5>
+                </div>
+                <div class="card-body">
+                  <table class="table table-sm">
+                    <tr>
+                      <td><strong>Face Cascade:</strong></td>
+                      <td>
+                        {% if debug_info.face_cascade_loaded %}
+                        <span class="badge badge-success">Loaded</span>
+                        {% else %}
+                        <span class="badge badge-danger">Not Loaded</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>KNN Classifier:</strong></td>
+                      <td>
+                        {% if debug_info.model_components.knn_classifier %}
+                        <span class="badge badge-success">Available</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Not Available</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>SVM Classifier:</strong></td>
+                      <td>
+                        {% if debug_info.model_components.svm_classifier %}
+                        <span class="badge badge-success">Available</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Not Available</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Ensemble Classifier:</strong></td>
+                      <td>
+                        {% if debug_info.model_components.ensemble_classifier %}
+                        <span class="badge badge-success">Available</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Not Available</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Scaler:</strong></td>
+                      <td>
+                        {% if debug_info.model_components.scaler %}
+                        <span class="badge badge-success">Available</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Not Available</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>Label Encoder:</strong></td>
+                      <td>
+                        {% if debug_info.model_components.label_encoder %}
+                        <span class="badge badge-success">Available</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Not Available</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Students List -->
+          {% if debug_info.model_status.success and debug_info.model_status.students %}
+          <div class="card">
+            <div class="card-header">
+              <h5>Danh sách sinh viên đã train</h5>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped">
+                  <thead>
+                    <tr>
+                      <th>Student ID</th>
+                      <th>Tên</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for student in debug_info.model_status.students %}
+                    <tr>
+                      <td><code>{{ student.student_id }}</code></td>
+                      <td>{{ student.name }}</td>
+                      <td><span class="badge badge-success">Trained</span></td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Test Recognition Section -->
+          <div class="card mt-4">
+            <div class="card-header">
+              <h5>Test Recognition</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>Upload ảnh để test</h6>
+                  <input type="file" id="testImage" class="form-control" accept="image/*" />
+                  <div class="mt-2">
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="recognitionMode" id="ensembleMode" value="ensemble" checked />
+                      <label class="form-check-label" for="ensembleMode"> Ensemble Mode (KNN + SVM + RF) </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="recognitionMode" id="knnMode" value="knn" />
+                      <label class="form-check-label" for="knnMode"> KNN Only Mode </label>
+                    </div>
+                  </div>
+                  <button id="testRecognitionBtn" class="btn btn-primary mt-2">
+                    <i class="fas fa-eye"></i>
+                    Test Recognition
+                  </button>
+                </div>
+                <div class="col-md-6">
+                  <h6>Kết quả test</h6>
+                  <div id="testResult" class="border p-3" style="min-height: 150px; background-color: #f8f9fa">
+                    <p class="text-muted">Chọn ảnh và nhấn "Test Recognition" để xem kết quả</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="row mt-4">
+            <div class="col-12">
+              <a href="{{ url_for('ai.dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i>
+                Về Dashboard
+              </a>
+              <a href="{{ url_for('ai.test_accuracy') }}" class="btn btn-info">
+                <i class="fas fa-chart-line"></i>
+                Test Accuracy
+              </a>
+              <button id="reloadModelBtn" class="btn btn-warning">
+                <i class="fas fa-redo"></i>
+                Reload Model
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const testImageInput = document.getElementById("testImage");
+    const testRecognitionBtn = document.getElementById("testRecognitionBtn");
+    const testResult = document.getElementById("testResult");
+    const reloadModelBtn = document.getElementById("reloadModelBtn");
+
+    testRecognitionBtn.addEventListener("click", function () {
+      if (!testImageInput.files[0]) {
+        alert("Vui lòng chọn ảnh để test");
+        return;
+      }
+
+      const file = testImageInput.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function (e) {
+        const imageData = e.target.result;
+        const useEnsemble = document.getElementById("ensembleMode").checked;
+
+        testResult.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Đang nhận diện...</p></div>';
+
+        fetch("/ai/api/recognize_advanced", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image: imageData,
+            use_ensemble: useEnsemble,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            displayTestResult(data, useEnsemble);
+          })
+          .catch((error) => {
+            testResult.innerHTML = `<div class="alert alert-danger">Lỗi: ${error.message}</div>`;
+          });
+      };
+
+      reader.readAsDataURL(file);
+    });
+
+    reloadModelBtn.addEventListener("click", function () {
+      location.reload();
+    });
+
+    function displayTestResult(data, useEnsemble) {
+      let html = "";
+
+      if (data.success && data.faces && data.faces.length > 0) {
+        html += '<div class="alert alert-success">Nhận diện thành công!</div>';
+
+        data.faces.forEach((face, index) => {
+          const confidence = (face.confidence * 100).toFixed(1);
+          const confidenceClass = confidence >= 60 ? "success" : confidence >= 40 ? "warning" : "danger";
+
+          html += `
+                    <div class="mb-2">
+                        <strong>Khuôn mặt ${index + 1}:</strong><br>
+                        <strong>ID:</strong> ${face.student_id}<br>
+                        <strong>Tên:</strong> ${face.name}<br>
+                        <strong>Confidence:</strong> <span class="badge badge-${confidenceClass}">${confidence}%</span><br>
+                        <strong>Method:</strong> ${face.method}<br>
+                        <small class="text-muted">Position: (${face.position.x}, ${face.position.y}, ${face.position.w}x${face.position.h})</small>
+                    </div>
+                `;
+        });
+      } else {
+        const reason = data.message || "Không rõ lý do";
+        html += `<div class="alert alert-warning">Không nhận diện được: ${reason}</div>`;
+      }
+
+      html += `<small class="text-muted">Mode: ${useEnsemble ? "Ensemble" : "KNN Only"}</small>`;
+
+      testResult.innerHTML = html;
+    }
+  });
+</script>
+{% endblock %}

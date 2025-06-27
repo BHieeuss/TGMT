@@ -7,6 +7,10 @@ import io
 from PIL import Image
 import json
 from datetime import datetime
+from auto_attendance_server import create_auto_attendance_session, stop_auto_attendance_session, get_active_sessions
+import webbrowser
+import threading
+import time
 
 attendance_bp = Blueprint('attendance', __name__)
 
@@ -113,9 +117,28 @@ def face_recognition_page(session_id):
     conn.close()
     return render_template('attendance/face_recognition.html', session=session)
 
+@attendance_bp.route('/face_recognition')
+def face_recognition():
+    """Trang chọn ca điểm danh để nhận diện khuôn mặt"""
+    conn = get_db_connection()
+    
+    # Lấy các ca điểm danh đang hoạt động hoặc gần đây
+    sessions = conn.execute('''
+        SELECT ast.*, s.subject_name, s.subject_code, c.class_name, c.class_code
+        FROM attendance_sessions ast
+        JOIN subjects s ON ast.subject_id = s.id
+        JOIN classes c ON ast.class_id = c.id
+        WHERE ast.session_date >= date('now', '-7 days')
+        ORDER BY ast.session_date DESC, ast.start_time DESC
+        LIMIT 20
+    ''').fetchall()
+    
+    conn.close()
+    return render_template('attendance/face_recognition_select.html', sessions=sessions)
+
 @attendance_bp.route('/api/recognize_face', methods=['POST'])
 def recognize_face():
-    """API nhận diện khuôn mặt (đơn giản hóa với OpenCV)"""
+    """API nhận diện khuôn mặt với AI model"""
     try:
         data = request.get_json()
         session_id = data.get('session_id')
@@ -124,86 +147,129 @@ def recognize_face():
         if not session_id or not image_data:
             return jsonify({'success': False, 'message': 'Thiếu dữ liệu'})
         
-        # Decode base64 image
-        image_data = image_data.split(',')[1]  # Remove data:image/jpeg;base64,
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
+        # Sử dụng AI model để nhận diện
+        from models.advanced_face_model import face_model
         
-        # Convert PIL image to numpy array
-        image_array = np.array(image)
-        gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+        if not face_model.is_trained:
+            return jsonify({'success': False, 'message': 'Model AI chưa được train'})
         
-        # Initialize face detector
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        # Nhận diện khuôn mặt - sử dụng ensemble=True để có kết quả tốt nhất
+        recognition_result = face_model.recognize_face(image_data, use_ensemble=True)
         
-        # Detect faces
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        # Trả về kết quả chi tiết bao gồm cả những khuôn mặt không nhận diện được
+        if recognition_result['success']:
+            # Trả về tất cả kết quả, bao gồm cả những khuôn mặt không đạt ngưỡng
+            all_faces = recognition_result.get('faces', [])
+            
+            # Thêm thông tin về những khuôn mặt được phát hiện nhưng không đạt ngưỡng
+            # (model có thể detect nhưng confidence/quality thấp)
+            detected_faces = []
+            
+            for face in all_faces:
+                # Chỉ thêm vào detected_faces những khuôn mặt có student_id (đã train)
+                if face.get('student_id'):
+                    detected_faces.append(face)
+                else:
+                    # Khuôn mặt phát hiện được nhưng không đủ điều kiện
+                    # Tạo face record cho việc hiển thị debug info
+                    detected_faces.append({
+                        'student_id': None,
+                        'name': 'Không nhận diện được',
+                        'confidence': face.get('confidence', 0),
+                        'quality_score': face.get('quality_score', 0),
+                        'combined_score': face.get('combined_score', 0),
+                        'quality_reasons': face.get('quality_reasons', []),
+                        'position': face.get('position', {})
+                    })
+            
+            return jsonify({
+                'success': True,
+                'faces': detected_faces,
+                'message': recognition_result.get('message', 'Nhận diện hoàn tất')
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'message': recognition_result.get('message', 'Không nhận diện được khuôn mặt'),
+                'faces': []
+            })
         
-        if len(faces) == 0:
-            return jsonify({'success': False, 'message': 'Không tìm thấy khuôn mặt trong ảnh'})
+        # Lấy khuôn mặt có confidence cao nhất trong số những khuôn mặt được nhận diện
+        valid_faces = [f for f in recognition_result.get('faces', []) if f.get('student_id')]
         
-        # Get session info
+        if not valid_faces:
+            return jsonify({
+                'success': False, 
+                'message': 'Không nhận diện được sinh viên nào có độ tin cậy đủ cao',
+                'faces': recognition_result.get('faces', [])
+            })
+        
+        best_face = max(valid_faces, key=lambda x: x.get('combined_score', x.get('confidence', 0)))
+        
+        # Kiểm tra combined score nếu có
+        min_score = best_face.get('combined_score', best_face['confidence'])
+        if min_score < 0.6:  # Giữ ngưỡng 0.6 như yêu cầu
+            quality_info = ""
+            if 'quality_score' in best_face:
+                quality_info = f" (chất lượng: {best_face['quality_score']:.1%})"
+            return jsonify({
+                'success': False, 
+                'message': f'Độ tin cậy thấp ({min_score:.1%}){quality_info}, không đủ tin cậy để điểm danh',
+                'faces': recognition_result.get('faces', [])
+            })
+        
+        student_id = best_face['student_id']
+        
+        # Get session info và kiểm tra sinh viên có trong lớp không
         conn = get_db_connection()
         session_info = conn.execute('''
             SELECT class_id FROM attendance_sessions WHERE id = ?
         ''', (session_id,)).fetchone()
-          # For enhanced demo: try to match faces using basic image comparison
-        students = conn.execute('''
-            SELECT id, student_id, full_name, face_encoding
+        
+        student = conn.execute('''
+            SELECT id, student_id, full_name 
             FROM students 
-            WHERE class_id = ? AND face_encoding IS NOT NULL
-            ORDER BY full_name
-        ''', (session_info['class_id'],)).fetchall()
+            WHERE student_id = ? AND class_id = ?
+        ''', (student_id, session_info['class_id'])).fetchone()
         
-        if not students:
+        if not student:
             conn.close()
-            return jsonify({'success': False, 'message': 'Không có sinh viên nào có dữ liệu khuôn mặt trong lớp này'})
-        
-        # Simple face matching using position comparison (demo logic)
-        best_match = None
-        for student in students:
-            if student['face_encoding']:
-                try:
-                    import json
-                    stored_data = json.loads(student['face_encoding'].replace("'", '"'))
-                    if 'face_file' in stored_data:
-                        # In a real system, this would do actual face comparison
-                        # For demo, we'll use the first student with face data
-                        best_match = student
-                        break
-                except:
-                    continue        
-        if not best_match:
-            conn.close()
-            return jsonify({'success': False, 'message': 'Không nhận diện được khuôn mặt'})
+            return jsonify({'success': False, 'message': f'Sinh viên {student_id} không thuộc lớp này'})
         
         # Check if already attended
         existing = conn.execute('''
             SELECT id FROM attendance_records 
             WHERE session_id = ? AND student_id = ?
-        ''', (session_id, best_match['id'])).fetchone()
+        ''', (session_id, student['id'])).fetchone()
         
         if existing:
             conn.close()
             return jsonify({
                 'success': False, 
-                'message': f'{best_match["full_name"]} đã điểm danh rồi!'
+                'message': f'{student["full_name"]} đã điểm danh rồi!'
             })
         
         # Record attendance
+        final_confidence = best_face.get('combined_score', best_face['confidence'])
         conn.execute('''
             INSERT INTO attendance_records (session_id, student_id, status, method, confidence)
             VALUES (?, ?, 'present', 'face_recognition', ?)
-        ''', (session_id, best_match['id'], 85.0))  # Demo confidence
+        ''', (session_id, student['id'], final_confidence * 100))
         conn.commit()
         conn.close()
         
+        # Tạo message chi tiết
+        quality_info = ""
+        if 'quality_score' in best_face:
+            quality_info = f" - Chất lượng: {best_face['quality_score']:.1%}"
+        
         return jsonify({
             'success': True,
-            'message': f'Điểm danh thành công cho {best_match["full_name"]} (Demo)',            'student': {
-                'id': best_match['student_id'],
-                'name': best_match['full_name'],
-                'confidence': 85.0
+            'message': f'Điểm danh thành công cho {student["full_name"]} (Độ tin cậy: {final_confidence:.1%}){quality_info}',
+            'student': {
+                'id': student['student_id'],
+                'name': student['full_name'],
+                'confidence': best_face['confidence'] * 100
             }
         })
             
@@ -251,6 +317,7 @@ def manual_attendance():
         # Record attendance
         conn.execute('''
             INSERT INTO attendance_records (session_id, student_id, status, method)
+            VALUES (?, ?, 'present', 'manual')
             VALUES (?, ?, 'present', 'manual')
         ''', (session_id, student['id']))
         conn.commit()
@@ -320,3 +387,123 @@ def api_session_attendance(session_id):
     
     conn.close()
     return jsonify([dict(row) for row in attendance])
+
+@attendance_bp.route('/camera')
+def camera():
+    """Trang điểm danh bằng camera"""
+    return render_template('camera.html')
+
+@attendance_bp.route('/sessions/create_auto', methods=['GET', 'POST'])
+def create_auto_session():
+    """Tạo ca điểm danh tự động"""
+    conn = get_db_connection()
+    
+    if request.method == 'POST':
+        session_name = request.form.get('session_name')
+        subject_id = request.form.get('subject_id')
+        class_id = request.form.get('class_id')
+        session_date = request.form.get('session_date', datetime.now().strftime('%Y-%m-%d'))
+        start_time = request.form.get('start_time', datetime.now().strftime('%H:%M'))
+        
+        if not all([session_name, subject_id, class_id]):
+            flash('Vui lòng nhập đầy đủ thông tin!', 'error')
+        else:
+            try:
+                # Tạo session trong database
+                cursor = conn.execute('''
+                    INSERT INTO attendance_sessions (session_name, subject_id, class_id, session_date, start_time, status)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (session_name, subject_id, class_id, session_date, start_time, 'active'))
+                
+                session_id = cursor.lastrowid
+                conn.commit()
+                
+                # Tạo auto attendance server
+                port = create_auto_attendance_session(session_id)
+                
+                if port:
+                    # Cập nhật port vào database
+                    conn.execute('''
+                        UPDATE attendance_sessions SET port = ? WHERE id = ?
+                    ''', (port, session_id))
+                    conn.commit()
+                    
+                    flash(f'🎉 Tạo ca điểm danh tự động thành công!', 'success')
+                    flash(f'🌐 Server đang chạy trên port: {port}', 'info')
+                    flash(f'🔗 Truy cập: http://localhost:{port}', 'info')
+                    
+                    # Mở browser tự động
+                    def open_browser():
+                        import time
+                        time.sleep(2)  # Đợi server khởi động hoàn toàn
+                        webbrowser.open(f'http://localhost:{port}')
+                    
+                    threading.Timer(1.0, open_browser).start()
+                    
+                    return redirect(url_for('attendance.auto_session_manager'))
+                else:
+                    flash('❌ Không thể tạo server điểm danh tự động! Vui lòng thử lại.', 'error')
+                    flash('💡 Kiểm tra: Camera có hoạt động? Model AI đã được train?', 'warning')
+                    
+            except Exception as e:
+                flash(f'Lỗi tạo ca điểm danh: {str(e)}', 'error')
+    
+    # Lấy danh sách môn học và lớp
+    subjects = conn.execute('SELECT id, subject_code, subject_name FROM subjects ORDER BY subject_name').fetchall()
+    classes = conn.execute('SELECT id, class_code, class_name FROM classes ORDER BY class_name').fetchall()
+    conn.close()
+    
+    return render_template('attendance/create_auto_session.html', subjects=subjects, classes=classes)
+
+@attendance_bp.route('/auto_sessions')
+def auto_session_manager():
+    """Quản lý các ca điểm danh tự động"""
+    # Lấy danh sách session đang hoạt động
+    active_sessions = get_active_sessions()
+    
+    # Lấy thông tin từ database
+    conn = get_db_connection()
+    session_data = {}
+    
+    for port, status in active_sessions.items():
+        session_id = status['session_id']
+        session_info = conn.execute('''
+            SELECT ast.*, s.subject_name, s.subject_code, c.class_name, c.class_code
+            FROM attendance_sessions ast
+            JOIN subjects s ON ast.subject_id = s.id
+            JOIN classes c ON ast.class_id = c.id
+            WHERE ast.id = ?
+        ''', (session_id,)).fetchone()
+        
+        if session_info:
+            session_data[port] = {
+                'session_info': dict(session_info),
+                'status': status,
+                'url': f'http://localhost:{port}'
+            }
+    
+    conn.close()
+    
+    return render_template('attendance/auto_session_manager.html', sessions=session_data)
+
+@attendance_bp.route('/auto_sessions/stop/<int:port>', methods=['POST'])
+def stop_auto_session(port):
+    """Dừng ca điểm danh tự động"""
+    try:
+        if stop_auto_attendance_session(port):
+            # Cập nhật status trong database
+            conn = get_db_connection()
+            conn.execute('''
+                UPDATE attendance_sessions SET status = 'completed' 
+                WHERE port = ?
+            ''', (port,))
+            conn.commit()
+            conn.close()
+            
+            flash('Đã dừng ca điểm danh tự động!', 'success')
+        else:
+            flash('Không thể dừng ca điểm danh!', 'error')
+    except Exception as e:
+        flash(f'Lỗi: {str(e)}', 'error')
+    
+    return redirect(url_for('attendance.auto_session_manager'))

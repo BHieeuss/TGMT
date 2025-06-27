@@ -1,0 +1,242 @@
+{% extends "base.html" %} {% block title %}Thêm Môn Học{% endblock %} {% block content %}
+<div class="container-fluid py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card bg-gradient-success shadow-lg">
+        <div class="card-body text-white">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-plus-circle-fill fs-1 me-3 text-warning icon-glow"></i>
+            <div>
+              <h2 class="mb-1">
+                <i class="bi bi-book-fill me-2"></i>
+                Thêm Môn Học Mới
+              </h2>
+              <p class="mb-0 opacity-8">Tạo môn học mới trong hệ thống quản lý</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card glass-card shadow-lg">
+        <div class="card-header bg-gradient-primary text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-pencil-square me-2"></i>
+            Thông Tin Môn Học
+          </h5>
+        </div>
+        <div class="card-body p-4">
+          <form method="POST" id="subjectForm">
+            <div class="row">
+              <!-- Mã môn học -->
+              <div class="col-md-6 mb-4">
+                <label for="subject_code" class="form-label">
+                  <i class="bi bi-code-square text-primary me-2"></i>
+                  Mã Môn Học <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control form-control-lg" id="subject_code" name="subject_code" placeholder="VD: IT001, MATH101..." pattern="[A-Z0-9]+" title="Chỉ được chứa chữ cái viết hoa và số" required />
+                <div class="form-text">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Mã môn học phải là duy nhất (chỉ chứa chữ hoa và số)
+                </div>
+              </div>
+
+              <!-- Tên môn học -->
+              <div class="col-md-6 mb-4">
+                <label for="subject_name" class="form-label">
+                  <i class="bi bi-book text-success me-2"></i>
+                  Tên Môn Học <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control form-control-lg" id="subject_name" name="subject_name" placeholder="VD: Lập trình Python, Toán rời rạc..." required />
+                <div class="form-text">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Nhập tên đầy đủ của môn học
+                </div>
+              </div>
+
+              <!-- Mô tả -->
+              <div class="col-12 mb-4">
+                <label for="description" class="form-label">
+                  <i class="bi bi-card-text text-info me-2"></i>
+                  Mô Tả Môn Học
+                </label>
+                <textarea class="form-control" id="description" name="description" rows="4" placeholder="Nhập mô tả chi tiết về môn học..."></textarea>
+                <div class="form-text">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Mô tả ngắn gọn về nội dung và mục tiêu của môn học (không bắt buộc)
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview Card -->
+            <div class="card glass-card mb-4" id="previewCard" style="display: none">
+              <div class="card-header bg-gradient-info text-white">
+                <h6 class="mb-0">
+                  <i class="bi bi-eye me-2"></i>
+                  Xem Trước
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-3">
+                    <strong>Mã môn:</strong>
+                    <span id="previewCode" class="text-primary"></span>
+                  </div>
+                  <div class="col-md-9">
+                    <strong>Tên môn:</strong>
+                    <span id="previewName" class="text-success"></span>
+                  </div>
+                </div>
+                <div class="row mt-2" id="previewDescRow" style="display: none">
+                  <div class="col-12">
+                    <strong>Mô tả:</strong>
+                    <span id="previewDesc" class="text-muted"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-between">
+              <a href="{{ url_for('subjects.list_subjects') }}" class="btn btn-secondary btn-lg">
+                <i class="bi bi-arrow-left me-2"></i>
+                Quay Lại
+              </a>
+
+              <div>
+                <button type="reset" class="btn btn-outline-warning btn-lg me-2">
+                  <i class="bi bi-arrow-clockwise me-2"></i>
+                  Làm Lại
+                </button>
+                <button type="submit" class="btn btn-gradient-success btn-lg" id="submitBtn">
+                  <i class="bi bi-check-circle-fill me-2"></i>
+                  Thêm Môn Học
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Guidelines -->
+    <div class="col-lg-4">
+      <div class="card glass-card shadow-lg">
+        <div class="card-header bg-gradient-warning text-white">
+          <h6 class="mb-0">
+            <i class="bi bi-lightbulb-fill me-2"></i>
+            Hướng Dẫn
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="timeline">
+            <div class="timeline-item">
+              <div class="timeline-marker bg-primary"></div>
+              <div class="timeline-content">
+                <h6 class="text-primary mb-1">Mã Môn Học</h6>
+                <p class="mb-0 small">Sử dụng mã ngắn gọn, dễ nhớ như IT001, MATH101</p>
+              </div>
+            </div>
+
+            <div class="timeline-item">
+              <div class="timeline-marker bg-success"></div>
+              <div class="timeline-content">
+                <h6 class="text-success mb-1">Tên Môn Học</h6>
+                <p class="mb-0 small">Đặt tên rõ ràng, đầy đủ về nội dung môn học</p>
+              </div>
+            </div>
+
+            <div class="timeline-item">
+              <div class="timeline-marker bg-info"></div>
+              <div class="timeline-content">
+                <h6 class="text-info mb-1">Mô Tả</h6>
+                <p class="mb-0 small">Giải thích ngắn gọn về mục tiêu và nội dung</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-info mt-3">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <strong>Lưu ý:</strong> Mã môn học không thể thay đổi sau khi tạo.
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Examples -->
+      <div class="card glass-card shadow-lg mt-4">
+        <div class="card-header bg-gradient-secondary text-white">
+          <h6 class="mb-0">
+            <i class="bi bi-star-fill me-2"></i>
+            Ví Dụ Mẫu
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="example-item mb-3 p-3 bg-light rounded"><strong class="text-primary">IT001</strong> - Nhập môn lập trình <br /><small class="text-muted">Môn cơ sở về lập trình máy tính</small></div>
+          <div class="example-item mb-3 p-3 bg-light rounded"><strong class="text-primary">MATH101</strong> - Toán cao cấp A1 <br /><small class="text-muted">Giải tích một biến và đại số tuyến tính</small></div>
+          <div class="example-item p-3 bg-light rounded"><strong class="text-primary">ENG201</strong> - Tiếng Anh chuyên ngành <br /><small class="text-muted">Tiếng Anh trong lĩnh vực công nghệ thông tin</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const subjectCode = document.getElementById("subject_code");
+    const subjectName = document.getElementById("subject_name");
+    const description = document.getElementById("description");
+    const previewCard = document.getElementById("previewCard");
+
+    // Auto uppercase for subject code
+    subjectCode.addEventListener("input", function () {
+      this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      updatePreview();
+    });
+
+    // Update preview on input
+    subjectName.addEventListener("input", updatePreview);
+    description.addEventListener("input", updatePreview);
+
+    function updatePreview() {
+      const code = subjectCode.value.trim();
+      const name = subjectName.value.trim();
+      const desc = description.value.trim();
+
+      if (code || name) {
+        document.getElementById("previewCode").textContent = code || "[Mã môn]";
+        document.getElementById("previewName").textContent = name || "[Tên môn học]";
+
+        if (desc) {
+          document.getElementById("previewDesc").textContent = desc;
+          document.getElementById("previewDescRow").style.display = "block";
+        } else {
+          document.getElementById("previewDescRow").style.display = "none";
+        }
+
+        previewCard.style.display = "block";
+      } else {
+        previewCard.style.display = "none";
+      }
+    }
+
+    // Form submission
+    document.getElementById("subjectForm").addEventListener("submit", function (e) {
+      const submitBtn = document.getElementById("submitBtn");
+      submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2 spin"></i>Đang thêm...';
+      submitBtn.disabled = true;
+    });
+
+    // Form reset
+    document.querySelector('button[type="reset"]').addEventListener("click", function () {
+      setTimeout(() => {
+        previewCard.style.display = "none";
+      }, 100);
+    });
+  });
+</script>
+{% endblock %}

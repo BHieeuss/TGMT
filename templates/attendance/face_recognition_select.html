@@ -1,0 +1,113 @@
+{% extends "base.html" %} {% block title %}Chọn Ca Điểm Danh - Face Recognition{% endblock %} {% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="fas fa-camera"></i>
+            Chọn Ca Điểm Danh để Nhận Diện Khuôn Mặt
+          </h4>
+        </div>
+        <div class="card-body">
+          {% if sessions %}
+          <div class="row">
+            {% for session in sessions %}
+            <div class="col-md-6 col-lg-4 mb-4">
+              <div class="card session-card h-100">
+                <div class="card-body">
+                  <h5 class="card-title">{{ session.session_name }}</h5>
+                  <p class="card-text">
+                    <strong>Môn học:</strong> {{ session.subject_name }} ({{ session.subject_code }})<br />
+                    <strong>Lớp:</strong> {{ session.class_name }} ({{ session.class_code }})<br />
+                    <strong>Ngày:</strong> {{ session.session_date }}<br />
+                    <strong>Thời gian:</strong> {{ session.start_time }} {% if session.end_time %} - {{ session.end_time }}{% endif %}
+                  </p>
+
+                  <!-- Session Status -->
+                  <span class="badge badge-success">Có thể điểm danh</span>
+                </div>
+                <div class="card-footer">
+                  <a href="{{ url_for('attendance.face_recognition_page', session_id=session.id) }}" class="btn btn-primary btn-block">
+                    <i class="fas fa-camera"></i>
+                    Bắt đầu điểm danh
+                  </a>
+                  <a href="{{ url_for('attendance.session_detail', session_id=session.id) }}" class="btn btn-secondary btn-sm mt-2">
+                    <i class="fas fa-eye"></i>
+                    Xem chi tiết
+                  </a>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="alert alert-info">
+            <h5><i class="fas fa-info-circle"></i> Không có ca điểm danh nào</h5>
+            <p>Hiện tại không có ca điểm danh nào trong 7 ngày gần đây.</p>
+            <a href="{{ url_for('attendance.add_session') }}" class="btn btn-primary">
+              <i class="fas fa-plus"></i>
+              Tạo ca điểm danh mới
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <h5><i class="fas fa-bolt"></i> Thao tác nhanh</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <a href="{{ url_for('attendance.add_session') }}" class="btn btn-success btn-block">
+                <i class="fas fa-plus"></i>
+                Tạo ca mới
+              </a>
+            </div>
+            <div class="col-md-3">
+              <a href="{{ url_for('attendance.list_sessions') }}" class="btn btn-info btn-block">
+                <i class="fas fa-list"></i>
+                Tất cả ca
+              </a>
+            </div>
+            <div class="col-md-3">
+              <a href="{{ url_for('ai.dashboard') }}" class="btn btn-warning btn-block">
+                <i class="fas fa-robot"></i>
+                AI Dashboard
+              </a>
+            </div>
+            <div class="col-md-3">
+              <a href="{{ url_for('camera') }}" class="btn btn-secondary btn-block">
+                <i class="fas fa-camera"></i>
+                Camera Test
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .session-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .session-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .badge {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+  }
+</style>
+{% endblock %}

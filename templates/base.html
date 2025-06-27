@@ -5,9 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Hệ thống điểm danh khuôn mặt{% endblock %}</title>
 
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <!-- Font Awesome -->
+    <!-- Tabler Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/icons-sprite.svg" />
+    <!-- Bootstrap Icons (Colorful) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+    <!-- Heroicons (Optional) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/heroicons@2.0.18/24/outline/index.css" />
+    <!-- Font Awesome (Keep for fallback) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
     <!-- Custom CSS -->
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet" />
@@ -16,10 +27,10 @@
   </head>
   <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top">
       <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('index') }}">
-          <i class="fas fa-user-check me-2"></i>
+          <i class="bi bi-person-check-fill icon-dashboard me-2"></i>
           Điểm danh khuôn mặt
         </a>
 
@@ -30,49 +41,80 @@
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav me-auto">
             <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('index') }}"> <i class="fas fa-home me-1"></i>Dashboard </a>
+              <a class="nav-link" href="{{ url_for('index') }}"> <i class="bi bi-house-fill icon-dashboard me-1"></i>Dashboard </a>
             </li>
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown"> <i class="fas fa-users me-1"></i>Quản lý </a>
+              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown"> <i class="bi bi-people-fill icon-manage me-1"></i>Quản lý </a>
               <ul class="dropdown-menu">
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('classes.list_classes') }}"> <i class="fas fa-school me-2"></i>Lớp học </a>
+                  <a class="dropdown-item" href="{{ url_for('classes.list_classes') }}"> <i class="bi bi-building icon-school me-2"></i>Lớp học </a>
                 </li>
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('students.list_students') }}"> <i class="fas fa-user-graduate me-2"></i>Sinh viên </a>
+                  <a class="dropdown-item" href="{{ url_for('students.list_students') }}"> <i class="bi bi-mortarboard-fill icon-student me-2"></i>Sinh viên </a>
                 </li>
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('subjects.list_subjects') }}"> <i class="fas fa-book me-2"></i>Môn học </a>
+                  <a class="dropdown-item" href="{{ url_for('subjects.list_subjects') }}"> <i class="bi bi-book-fill icon-book me-2"></i>Môn học </a>
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('capture_faces') }}"> <i class="fas fa-camera me-2"></i>Thu thập khuôn mặt </a>
+                  <a class="dropdown-item" href="{{ url_for('capture_faces') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Thu thập khuôn mặt </a>
                 </li>
               </ul>
             </li>
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="fas fa-calendar-check me-1"></i>Điểm danh </a>
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="bi bi-calendar-check-fill icon-attendance me-1"></i>Điểm danh </a>
               <ul class="dropdown-menu">
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('attendance.list_sessions') }}"> <i class="fas fa-list me-2"></i>Ca điểm danh </a>
+                  <a class="dropdown-item" href="{{ url_for('attendance.list_sessions') }}"> <i class="bi bi-list-ul icon-list me-2"></i>Ca điểm danh </a>
                 </li>
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('attendance.add_session') }}"> <i class="fas fa-plus me-2"></i>Tạo ca mới </a>
+                  <a class="dropdown-item" href="{{ url_for('attendance.add_session') }}"> <i class="bi bi-plus-circle-fill icon-plus me-2"></i>Tạo ca mới </a>
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('camera') }}"> <i class="fas fa-camera me-2"></i>Điểm danh camera </a>
+                  <a class="dropdown-item" href="{{ url_for('attendance.create_auto_session') }}"> <i class="bi bi-robot icon-ai me-2"></i>Tạo ca tự động </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('attendance.auto_session_manager') }}"> <i class="bi bi-gear-fill icon-wrench me-2"></i>Quản lý ca tự động </a>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('camera') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Điểm danh camera </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('test_camera') }}"> <i class="bi bi-tools icon-wrench me-2"></i>Test Camera </a>
                 </li>
               </ul>
             </li>
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="fas fa-chart-bar me-1"></i>Báo cáo </a>
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="bi bi-robot icon-ai me-1"></i>AI & Training </a>
               <ul class="dropdown-menu">
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('reports.attendance_report') }}"> <i class="fas fa-table me-2"></i>Báo cáo điểm danh </a>
+                  <a class="dropdown-item" href="{{ url_for('ai.dashboard') }}"> <i class="bi bi-speedometer2 icon-chart me-2"></i>AI Dashboard </a>
                 </li>
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('reports.statistics') }}"> <i class="fas fa-chart-pie me-2"></i>Thống kê </a>
+                  <a class="dropdown-item" href="{{ url_for('ai.test') }}"> <i class="bi bi-flask icon-ai me-2"></i>Test Nhận diện </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('ai.test_accuracy') }}"> <i class="bi bi-graph-up icon-chart me-2"></i>Test Accuracy </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('ai.debug_model') }}"> <i class="bi bi-bug icon-wrench me-2"></i>Debug Model </a>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('capture_faces') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Thu thập ảnh </a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="bi bi-bar-chart-fill icon-report me-1"></i>Báo cáo </a>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('reports.attendance_report') }}"> <i class="bi bi-table icon-chart me-2"></i>Báo cáo điểm danh </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('reports.statistics') }}"> <i class="bi bi-pie-chart-fill icon-chart me-2"></i>Thống kê </a>
                 </li>
               </ul>
             </li>
@@ -80,10 +122,10 @@
 
           <ul class="navbar-nav">
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="fas fa-user me-1"></i>Admin </a>
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="bi bi-person-circle icon-admin me-1"></i>Admin </a>
               <ul class="dropdown-menu">
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('auth.logout') }}"> <i class="fas fa-sign-out-alt me-2"></i>Đăng xuất </a>
+                  <a class="dropdown-item" href="{{ url_for('auth.logout') }}"> <i class="bi bi-box-arrow-right icon-logout me-2"></i>Đăng xuất </a>
                 </li>
               </ul>
             </li>
@@ -96,19 +138,28 @@
     <main class="main-content">
       <div class="container-fluid">
         <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category, message in messages %}
-        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %}
+        <div class="container-fluid fade-in">
+          {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-medium" role="alert">
+            <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' or category == 'danger' else 'check-circle' if category == 'success' else 'info-circle' }} me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %} {% endif %} {% endwith %} {% block content %}{% endblock %}
+        {% endif %} {% endwith %} {% block content %}{% endblock %}
       </div>
     </main>
 
     <!-- Footer -->
-    <footer class="bg-light text-center py-3 mt-5">
+    <footer class="text-center py-4">
       <div class="container">
-        <p class="mb-0">&copy; 2025 Hệ thống điểm danh khuôn mặt. Được phát triển bằng Flask & AI.</p>
+        <p class="mb-0">
+          <i class="bi bi-heart-fill icon-heart me-1"></i>
+          &copy; 2025 Hệ thống điểm danh khuôn mặt. Được phát triển bằng Flask & AI.
+          <i class="bi bi-robot icon-robot ms-1"></i>
+        </p>
       </div>
     </footer>
 

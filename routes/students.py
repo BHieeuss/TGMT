@@ -236,3 +236,39 @@ def api_captured_faces():
     
     conn.close()
     return jsonify(result)
+
+@students_bp.route('/api/student_faces/<student_id>')
+def api_student_faces(student_id):
+    """API lấy thông tin số ảnh khuôn mặt của sinh viên"""
+    conn = get_db_connection()
+    
+    # Đếm số file ảnh trong thư mục uploads của sinh viên
+    uploads_dir = os.path.join(current_app.static_folder, '..', 'uploads')
+    count = 0
+    
+    if os.path.exists(uploads_dir):
+        for filename in os.listdir(uploads_dir):
+            if filename.startswith(f"face_{student_id}_") and filename.endswith(('.jpg', '.jpeg', '.png')):
+                count += 1
+    
+    # Lấy thông tin sinh viên
+    student = conn.execute('''
+        SELECT student_id, full_name
+        FROM students
+        WHERE student_id = ?
+    ''', (student_id,)).fetchone()
+    
+    conn.close()
+    
+    if student:
+        return jsonify({
+            'success': True,
+            'student_id': student['student_id'],
+            'student_name': student['full_name'],
+            'count': count
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'Không tìm thấy sinh viên'
+        })

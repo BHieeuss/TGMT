@@ -1,0 +1,297 @@
+{% extends "base.html" %} {% block title %}Chỉnh Sửa Môn Học{% endblock %} {% block content %}
+<div class="container-fluid py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card bg-gradient-warning shadow-lg">
+        <div class="card-body text-white">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-pencil-square fs-1 me-3 text-dark icon-glow"></i>
+            <div>
+              <h2 class="mb-1">
+                <i class="bi bi-gear-fill me-2"></i>
+                Chỉnh Sửa Môn Học
+              </h2>
+              <p class="mb-0 opacity-8">Cập nhật thông tin môn học: {{ subject_info.subject_code }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card glass-card shadow-lg">
+        <div class="card-header bg-gradient-primary text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-pencil-square me-2"></i>
+            Cập Nhật Thông Tin
+          </h5>
+        </div>
+        <div class="card-body p-4">
+          <form method="POST" id="editSubjectForm">
+            <div class="row">
+              <!-- Mã môn học -->
+              <div class="col-md-6 mb-4">
+                <label for="subject_code" class="form-label">
+                  <i class="bi bi-code-square text-primary me-2"></i>
+                  Mã Môn Học <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control form-control-lg" id="subject_code" name="subject_code" value="{{ subject_info.subject_code }}" pattern="[A-Z0-9]+" title="Chỉ được chứa chữ cái viết hoa và số" required />
+                <div class="form-text">
+                  <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                  Thay đổi mã môn có thể ảnh hưởng đến dữ liệu hiện có
+                </div>
+              </div>
+
+              <!-- Tên môn học -->
+              <div class="col-md-6 mb-4">
+                <label for="subject_name" class="form-label">
+                  <i class="bi bi-book text-success me-2"></i>
+                  Tên Môn Học <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control form-control-lg" id="subject_name" name="subject_name" value="{{ subject_info.subject_name }}" required />
+                <div class="form-text">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Nhập tên đầy đủ của môn học
+                </div>
+              </div>
+
+              <!-- Mô tả -->
+              <div class="col-12 mb-4">
+                <label for="description" class="form-label">
+                  <i class="bi bi-card-text text-info me-2"></i>
+                  Mô Tả Môn Học
+                </label>
+                <textarea class="form-control" id="description" name="description" rows="4" placeholder="Nhập mô tả chi tiết về môn học...">{{ subject_info.description or '' }}</textarea>
+                <div class="form-text">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Mô tả ngắn gọn về nội dung và mục tiêu của môn học
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview Card -->
+            <div class="card glass-card mb-4" id="previewCard">
+              <div class="card-header bg-gradient-info text-white">
+                <h6 class="mb-0">
+                  <i class="bi bi-eye me-2"></i>
+                  Xem Trước Thay Đổi
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-3">
+                    <strong>Mã môn:</strong>
+                    <span id="previewCode" class="text-primary">{{ subject_info.subject_code }}</span>
+                  </div>
+                  <div class="col-md-9">
+                    <strong>Tên môn:</strong>
+                    <span id="previewName" class="text-success">{{ subject_info.subject_name }}</span>
+                  </div>
+                </div>
+                <div class="row mt-2" id="previewDescRow">
+                  <div class="col-12">
+                    <strong>Mô tả:</strong>
+                    <span id="previewDesc" class="text-muted">{{ subject_info.description or 'Chưa có mô tả' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-between">
+              <a href="{{ url_for('subjects.list_subjects') }}" class="btn btn-secondary btn-lg">
+                <i class="bi bi-arrow-left me-2"></i>
+                Quay Lại
+              </a>
+
+              <div>
+                <button type="button" class="btn btn-outline-info btn-lg me-2" onclick="resetForm()">
+                  <i class="bi bi-arrow-clockwise me-2"></i>
+                  Khôi Phục
+                </button>
+                <button type="submit" class="btn btn-gradient-warning btn-lg" id="submitBtn">
+                  <i class="bi bi-check-circle-fill me-2"></i>
+                  Cập Nhật
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="col-lg-4">
+      <!-- Current Info -->
+      <div class="card glass-card shadow-lg mb-4">
+        <div class="card-header bg-gradient-info text-white">
+          <h6 class="mb-0">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            Thông Tin Hiện Tại
+          </h6>
+        </div>
+        <div class="card-body">
+          <table class="table table-borderless mb-0">
+            <tr>
+              <td><strong>Mã môn:</strong></td>
+              <td><span class="badge bg-primary">{{ subject_info.subject_code }}</span></td>
+            </tr>
+            <tr>
+              <td><strong>Tên môn:</strong></td>
+              <td>{{ subject_info.subject_name }}</td>
+            </tr>
+            <tr>
+              <td><strong>Ngày tạo:</strong></td>
+              <td>
+                <small class="text-muted"> {% if subject_info.created_at %} {{ subject_info.created_at[:16] if subject_info.created_at else 'N/A' }} {% else %} N/A {% endif %} </small>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Statistics -->
+      <div class="card glass-card shadow-lg mb-4">
+        <div class="card-header bg-gradient-success text-white">
+          <h6 class="mb-0">
+            <i class="bi bi-graph-up me-2"></i>
+            Thống Kê Sử Dụng
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span>Ca điểm danh:</span>
+            <span class="badge bg-info badge-lg">{{ session_count or 0 }}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span>Lượt điểm danh:</span>
+            <span class="badge bg-success badge-lg">{{ attendance_count or 0 }}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span>Lần cập nhật cuối:</span>
+            <span class="badge bg-secondary badge-sm">Hôm nay</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Warning -->
+      {% if session_count and session_count > 0 %}
+      <div class="card glass-card shadow-lg">
+        <div class="card-header bg-gradient-danger text-white">
+          <h6 class="mb-0">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Cảnh Báo
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-warning mb-0">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            Môn học này đã có <strong>{{ session_count }}</strong> ca điểm danh. Việc thay đổi mã môn có thể ảnh hưởng đến dữ liệu hiện có.
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Quick Actions -->
+      <div class="card glass-card shadow-lg mt-4">
+        <div class="card-header bg-gradient-secondary text-white">
+          <h6 class="mb-0">
+            <i class="bi bi-lightning-fill me-2"></i>
+            Thao Tác Nhanh
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="d-grid gap-2">
+            <a href="{{ url_for('attendance.list_sessions') }}?subject_id={{ subject_info.id }}" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-calendar-check me-2"></i>
+              Xem Ca Điểm Danh
+            </a>
+            <button class="btn btn-outline-info btn-sm" onclick="duplicateSubject()">
+              <i class="bi bi-files me-2"></i>
+              Nhân Bản Môn Học
+            </button>
+            <button class="btn btn-outline-success btn-sm" onclick="exportSubjectData()">
+              <i class="bi bi-download me-2"></i>
+              Xuất Dữ Liệu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Store original values
+  const originalValues = {
+    subject_code: "{{ subject_info.subject_code }}",
+    subject_name: "{{ subject_info.subject_name }}",
+    description: '{{ subject_info.description or "" }}',
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const subjectCode = document.getElementById("subject_code");
+    const subjectName = document.getElementById("subject_name");
+    const description = document.getElementById("description");
+
+    // Auto uppercase for subject code
+    subjectCode.addEventListener("input", function () {
+      this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      updatePreview();
+    });
+
+    // Update preview on input
+    subjectName.addEventListener("input", updatePreview);
+    description.addEventListener("input", updatePreview);
+
+    function updatePreview() {
+      document.getElementById("previewCode").textContent = subjectCode.value || "[Mã môn]";
+      document.getElementById("previewName").textContent = subjectName.value || "[Tên môn học]";
+      document.getElementById("previewDesc").textContent = description.value || "Chưa có mô tả";
+    }
+
+    // Form submission
+    document.getElementById("editSubjectForm").addEventListener("submit", function (e) {
+      const submitBtn = document.getElementById("submitBtn");
+      submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2 spin"></i>Đang cập nhật...';
+      submitBtn.disabled = true;
+    });
+  });
+
+  // Reset form to original values
+  function resetForm() {
+    document.getElementById("subject_code").value = originalValues.subject_code;
+    document.getElementById("subject_name").value = originalValues.subject_name;
+    document.getElementById("description").value = originalValues.description;
+
+    // Update preview
+    document.getElementById("previewCode").textContent = originalValues.subject_code;
+    document.getElementById("previewName").textContent = originalValues.subject_name;
+    document.getElementById("previewDesc").textContent = originalValues.description || "Chưa có mô tả";
+  }
+
+  // Duplicate subject
+  function duplicateSubject() {
+    const code = document.getElementById("subject_code").value;
+    const name = document.getElementById("subject_name").value;
+    const desc = document.getElementById("description").value;
+
+    const url = new URL('{{ url_for("subjects.add_subject") }}', window.location.origin);
+    url.searchParams.set("duplicate", "true");
+    url.searchParams.set("code", code);
+    url.searchParams.set("name", name + " (Copy)");
+    url.searchParams.set("desc", desc);
+
+    window.location.href = url.toString();
+  }
+
+  // Export subject data
+  function exportSubjectData() {
+    window.location.href = "/subjects/export/{{ subject_info.id }}";
+  }
+</script>
+{% endblock %}

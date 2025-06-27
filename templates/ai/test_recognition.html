@@ -1,0 +1,448 @@
+{% extends "base.html" %} {% block title %}Test AI Recognition{% endblock %} {% block head %}
+<style>
+  .camera-container {
+    position: relative;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  #video {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  .recognition-result {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .face-detection-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+
+  .face-box {
+    position: absolute;
+    border: 3px solid #28a745;
+    border-radius: 5px;
+    background: rgba(40, 167, 69, 0.1);
+  }
+
+  .face-label {
+    position: absolute;
+    background: #28a745;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  .confidence-bar {
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 5px;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+  }
+
+  .model-info {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+  <h1 class="h2">
+    <i class="fas fa-vial me-2"></i>
+    Test AI Recognition
+  </h1>
+  <div class="btn-toolbar mb-2 mb-md-0">
+    <a href="{{ url_for('ai.dashboard') }}" class="btn btn-outline-secondary"> <i class="fas fa-arrow-left me-1"></i>Quay lại Dashboard </a>
+  </div>
+</div>
+
+<!-- Model Information -->
+<div class="recognition-result">
+  <div class="model-info">
+    <h5><i class="fas fa-robot me-2"></i>Thông tin Model</h5>
+    <div class="row">
+      <div class="col-md-6">
+        <p><strong>Số sinh viên đã train:</strong> {{ model_info.total_faces }}</p>
+        <p>
+          <strong>Trạng thái:</strong>
+          {% if model_info.model_exists %}
+          <span class="badge bg-success">Sẵn sàng</span>
+          {% else %}
+          <span class="badge bg-danger">Chưa train</span>
+          {% endif %}
+        </p>
+      </div>
+      <div class="col-md-6">
+        {% if model_info.total_faces == 0 %}
+        <div class="alert alert-warning mb-0">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          Model chưa được train. <a href="{{ url_for('ai.dashboard') }}" class="text-decoration-none">Train ngay</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <!-- Camera Section -->
+  <div class="col-lg-8">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="fas fa-video me-2"></i>
+          Camera Test
+        </h5>
+      </div>
+      <div class="card-body text-center">
+        <div class="camera-container">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="canvas" style="display: none"></canvas>
+          <canvas id="overlay" class="face-detection-overlay"></canvas>
+        </div>
+
+        <div class="mt-3">
+          <button class="btn btn-success btn-lg me-2" id="startCamera" onclick="startCamera()"><i class="fas fa-play me-2"></i>Bật camera</button>
+          <button class="btn btn-danger btn-lg me-2" id="stopCamera" onclick="stopCamera()" style="display: none"><i class="fas fa-stop me-2"></i>Tắt camera</button>
+          <button class="btn btn-primary btn-lg" id="testRecognition" onclick="testRecognition()" style="display: none"><i class="fas fa-search me-2"></i>Test nhận diện</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Section -->
+  <div class="col-lg-4">
+    <div class="card shadow">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="fas fa-search me-2"></i>
+          Kết quả nhận diện
+        </h5>
+      </div>
+      <div class="card-body">
+        <div id="recognitionResults" style="min-height: 200px">
+          <div class="text-center text-muted">
+            <i class="fas fa-info-circle fa-2x mb-3"></i>
+            <p>Bật camera và nhấn "Test nhận diện" để bắt đầu</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto Recognition Toggle -->
+    <div class="card shadow mt-3">
+      <div class="card-header">
+        <h6 class="mb-0">
+          <i class="fas fa-cog me-2"></i>
+          Cài đặt
+        </h6>
+      </div>
+      <div class="card-body">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="autoRecognition" />
+          <label class="form-check-label" for="autoRecognition"> Nhận diện tự động </label>
+        </div>
+        <small class="text-muted">Nhận diện liên tục mỗi 2 giây</small>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  let video = document.getElementById("video");
+  let canvas = document.getElementById("canvas");
+  let overlay = document.getElementById("overlay");
+  let currentStream = null;
+  let autoRecognitionInterval = null;
+  let isRecognizing = false;
+
+  // Start camera
+  async function startCamera() {
+    try {
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user",
+        },
+      });
+
+      video.srcObject = currentStream;
+
+      // Wait for video to load
+      video.addEventListener("loadedmetadata", () => {
+        overlay.width = video.videoWidth;
+        overlay.height = video.videoHeight;
+      });
+
+      document.getElementById("startCamera").style.display = "none";
+      document.getElementById("stopCamera").style.display = "inline-block";
+      document.getElementById("testRecognition").style.display = "inline-block";
+
+      showMessage("Camera đã được bật", "success");
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      showMessage("Không thể truy cập camera", "error");
+    }
+  }
+
+  // Stop camera
+  function stopCamera() {
+    if (currentStream) {
+      currentStream.getTracks().forEach((track) => track.stop());
+      currentStream = null;
+      video.srcObject = null;
+
+      document.getElementById("startCamera").style.display = "inline-block";
+      document.getElementById("stopCamera").style.display = "none";
+      document.getElementById("testRecognition").style.display = "none";
+
+      // Stop auto recognition
+      if (autoRecognitionInterval) {
+        clearInterval(autoRecognitionInterval);
+        autoRecognitionInterval = null;
+      }
+
+      // Clear overlay
+      const ctx = overlay.getContext("2d");
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+      // Clear results
+      document.getElementById("recognitionResults").innerHTML = `
+            <div class="text-center text-muted">
+                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                <p>Bật camera và nhấn "Test nhận diện" để bắt đầu</p>
+            </div>
+        `;
+
+      showMessage("Camera đã được tắt", "info");
+    }
+  }
+
+  // Test face recognition
+  async function testRecognition() {
+    if (!currentStream || isRecognizing) {
+      return;
+    }
+
+    isRecognizing = true;
+
+    try {
+      // Capture frame from video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0);
+
+      // Convert to base64
+      const imageData = canvas.toDataURL("image/jpeg", 0.8);
+
+      // Show loading
+      document.getElementById("recognitionResults").innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status"></div>
+                <p>Đang nhận diện...</p>
+            </div>
+        `;
+
+      // Call recognition API
+      const response = await fetch("/ai/api/test_recognize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imageData }),
+      });
+
+      const result = await response.json();
+      displayRecognitionResults(result);
+      drawFaceBoxes(result);
+    } catch (error) {
+      console.error("Error in recognition:", error);
+      document.getElementById("recognitionResults").innerHTML = `
+            <div class="text-danger text-center">
+                <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                <p>Lỗi khi nhận diện</p>
+            </div>
+        `;
+    } finally {
+      isRecognizing = false;
+    }
+  }
+
+  // Display recognition results
+  function displayRecognitionResults(result) {
+    const resultsDiv = document.getElementById("recognitionResults");
+
+    if (result.success && result.faces && result.faces.length > 0) {
+      let html = "";
+
+      result.faces.forEach((face, index) => {
+        const confidence = Math.round(face.confidence * 100);
+        const isRecognized = face.student_id !== null;
+
+        html += `
+                <div class="mb-3 p-3 border rounded ${isRecognized ? "border-success bg-light" : "border-warning bg-warning bg-opacity-10"}">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-${isRecognized ? "user-check" : "user-question"} me-2"></i>
+                        <strong>${isRecognized ? face.name : "Không nhận diện được"}</strong>
+                    </div>
+                    
+                    ${
+                      isRecognized
+                        ? `
+                        <p class="mb-1 small">
+                            <strong>MSSV:</strong> ${face.student_id}
+                        </p>
+                        ${
+                          face.student_info
+                            ? `
+                            <p class="mb-1 small">
+                                <strong>Lớp:</strong> ${face.student_info.class_id}
+                            </p>
+                        `
+                            : ""
+                        }
+                    `
+                        : ""
+                    }
+                    
+                    <div class="mb-2">
+                        <small>Độ tin cậy: ${confidence}%</small>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${confidence}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+      });
+
+      resultsDiv.innerHTML = html;
+    } else if (result.success && result.face_count === 0) {
+      resultsDiv.innerHTML = `
+            <div class="text-warning text-center">
+                <i class="fas fa-user-slash fa-2x mb-3"></i>
+                <p>Không phát hiện khuôn mặt</p>
+                <small>Hãy di chuyển gần camera hơn</small>
+            </div>
+        `;
+    } else {
+      resultsDiv.innerHTML = `
+            <div class="text-danger text-center">
+                <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                <p>Lỗi nhận diện</p>
+                <small>${result.message || "Lỗi không xác định"}</small>
+            </div>
+        `;
+    }
+  }
+
+  // Draw face detection boxes
+  function drawFaceBoxes(result) {
+    const ctx = overlay.getContext("2d");
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    if (result.success && result.faces && result.faces.length > 0) {
+      result.faces.forEach((face) => {
+        // Sử dụng face.position thay vì face.location
+        const position = face.position;
+        if (!position) return; // Skip nếu không có position
+
+        const { x, y, w, h } = position;
+        const isRecognized = face.student_id !== null;
+
+        // Draw rectangle
+        ctx.strokeStyle = isRecognized ? "#28a745" : "#ffc107";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, w, h);
+
+        // Draw label background
+        const label = isRecognized ? face.name : "Unknown";
+        const confidence = face.confidence ? ` (${(face.confidence * 100).toFixed(1)}%)` : "";
+        const fullLabel = label + confidence;
+
+        ctx.fillStyle = isRecognized ? "#28a745" : "#ffc107";
+        ctx.fillRect(x, y - 25, fullLabel.length * 8 + 10, 25);
+
+        // Draw label text
+        ctx.fillStyle = "white";
+        ctx.font = "14px Arial";
+        ctx.fillText(fullLabel, x + 5, y - 8);
+      });
+    }
+  }
+
+  // Auto recognition toggle
+  document.getElementById("autoRecognition").addEventListener("change", function () {
+    if (this.checked) {
+      if (currentStream) {
+        autoRecognitionInterval = setInterval(() => {
+          if (!isRecognizing) {
+            testRecognition();
+          }
+        }, 2000);
+        showMessage("Bật nhận diện tự động", "info");
+      } else {
+        this.checked = false;
+        showMessage("Vui lòng bật camera trước", "warning");
+      }
+    } else {
+      if (autoRecognitionInterval) {
+        clearInterval(autoRecognitionInterval);
+        autoRecognitionInterval = null;
+      }
+      showMessage("Tắt nhận diện tự động", "info");
+    }
+  });
+
+  // Show message function
+  function showMessage(message, type) {
+    const alertClass = type === "error" ? "danger" : type;
+    const alert = document.createElement("div");
+    alert.className = `alert alert-${alertClass} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = "top: 20px; right: 20px; z-index: 9999; max-width: 400px;";
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(alert);
+
+    setTimeout(() => {
+      if (alert.parentNode) {
+        alert.remove();
+      }
+    }, 5000);
+  }
+
+  // Cleanup on page unload
+  window.addEventListener("beforeunload", function () {
+    if (currentStream) {
+      currentStream.getTracks().forEach((track) => track.stop());
+    }
+    if (autoRecognitionInterval) {
+      clearInterval(autoRecognitionInterval);
+    }
+  });
+</script>
+{% endblock %}

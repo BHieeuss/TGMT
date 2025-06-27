@@ -1,0 +1,220 @@
+{% extends "base.html" %} {% block title %}Quản lý ca điểm danh tự động{% endblock %} {% block content %}
+<div class="container-fluid px-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-4 pb-3 mb-5">
+    <h1 class="h2 text-gradient fade-in mb-0">
+      <i class="bi bi-gear icon-wrench me-3"></i>
+      Quản lý ca điểm danh tự động
+    </h1>
+    <div class="btn-toolbar">
+      <a href="{{ url_for('attendance.create_auto_session') }}" class="btn btn-success btn-lg shadow-medium hover-lift me-2"> <i class="bi bi-plus-circle-fill icon-plus me-2"></i>Tạo ca mới </a>
+      <a href="{{ url_for('attendance.list_sessions') }}" class="btn btn-outline-secondary hover-lift"> <i class="bi bi-arrow-left me-2"></i>Quay lại </a>
+    </div>
+  </div>
+
+  <!-- Statistics -->
+  <div class="row mb-5">
+    <div class="col-md-3 mb-3">
+      <div class="card glass-card border-left-primary shadow-strong h-100 hover-lift scale-in">
+        <div class="card-body p-4">
+          <div class="row no-gutters align-items-center">
+            <div class="col-8">
+              <div class="text-xs font-weight-bold text-primary text-uppercase mb-3 ls-1">Ca đang hoạt động</div>
+              <div class="h2 mb-0 font-weight-bold text-gradient">{{ sessions|length }}</div>
+            </div>
+            <div class="col-4 text-end">
+              <i class="bi bi-play-circle icon-ai" style="font-size: 3.5rem; opacity: 0.7"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+      <div class="card glass-card border-left-success shadow-strong h-100 hover-lift scale-in" style="animation-delay: 0.1s">
+        <div class="card-body p-4">
+          <div class="row no-gutters align-items-center">
+            <div class="col-8">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-3 ls-1">Tổng điểm danh</div>
+              <div class="h2 mb-0 font-weight-bold text-gradient">{% set total_attendance = 0 %} {% for port, data in sessions.items() %} {% set total_attendance = total_attendance + data.status.attendance_count %} {% endfor %} {{ total_attendance }}</div>
+            </div>
+            <div class="col-4 text-end">
+              <i class="bi bi-check-circle icon-plus" style="font-size: 3.5rem; opacity: 0.7"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+      <div class="card glass-card border-left-info shadow-strong h-100 hover-lift scale-in" style="animation-delay: 0.2s">
+        <div class="card-body p-4">
+          <div class="row no-gutters align-items-center">
+            <div class="col-8">
+              <div class="text-xs font-weight-bold text-info text-uppercase mb-3 ls-1">Port đang dùng</div>
+              <div class="h2 mb-0 font-weight-bold text-gradient">{% if sessions %} {{ sessions.keys()|list|length }} {% else %} 0 {% endif %}</div>
+            </div>
+            <div class="col-4 text-end">
+              <i class="bi bi-hdd-network icon-chart" style="font-size: 3.5rem; opacity: 0.7"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+      <div class="card glass-card border-left-warning shadow-strong h-100 hover-lift scale-in" style="animation-delay: 0.3s">
+        <div class="card-body p-4">
+          <div class="row no-gutters align-items-center">
+            <div class="col-8">
+              <div class="text-xs font-weight-bold text-warning text-uppercase mb-3 ls-1">Trạng thái hệ thống</div>
+              <div class="h6 mb-0 font-weight-bold">
+                {% if sessions %}
+                <span class="badge bg-success fs-6">ĐANG HOẠT ĐỘNG</span>
+                {% else %}
+                <span class="badge bg-secondary fs-6">KHÔNG HOẠT ĐỘNG</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-4 text-end">
+              <i class="bi bi-cpu icon-wrench" style="font-size: 3.5rem; opacity: 0.7"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Sessions -->
+  {% if sessions %}
+  <div class="row">
+    <div class="col-12">
+      <div class="card glass-card shadow-strong fade-in">
+        <div class="card-header bg-gradient-primary text-white py-4">
+          <h4 class="m-0 font-weight-bold">
+            <i class="bi bi-camera-video-fill me-3" style="font-size: 1.8rem"></i>
+            Ca điểm danh đang hoạt động
+          </h4>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 1rem">
+              <thead style="background-color: #f8f9fa">
+                <tr>
+                  <th class="px-4 py-4 border-0">
+                    <i class="bi bi-tag icon-list me-2"></i>
+                    <strong>Tên ca điểm danh</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0">
+                    <i class="bi bi-building icon-school me-2"></i>
+                    <strong>Lớp học</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0">
+                    <i class="bi bi-book icon-book me-2"></i>
+                    <strong>Môn học</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0 text-center">
+                    <i class="bi bi-hdd-network icon-chart me-2"></i>
+                    <strong>Port</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0 text-center">
+                    <i class="bi bi-people icon-student me-2"></i>
+                    <strong>Điểm danh</strong>
+                  </th>
+                  <th class="px-4 py-4 border-0 text-center">
+                    <i class="bi bi-gear icon-wrench me-2"></i>
+                    <strong>Thao tác</strong>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for port, data in sessions.items() %}
+                <tr style="border-bottom: 1px solid #e9ecef">
+                  <td class="px-4 py-4">
+                    <div class="d-flex align-items-center">
+                      <div class="me-3">
+                        <div class="badge bg-success rounded-pill" style="width: 12px; height: 12px; animation: pulse 2s infinite"></div>
+                      </div>
+                      <div>
+                        <div class="fw-bold text-dark">{{ data.session_info.session_name }}</div>
+                        <small class="text-muted"> <i class="bi bi-calendar3 me-1"></i>{{ data.session_info.session_date }} <i class="bi bi-clock ms-2 me-1"></i>{{ data.session_info.start_time }} </small>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4">
+                    <span class="fw-medium text-primary">{{ data.session_info.class_name }}</span>
+                    <br />
+                    <small class="text-muted">{{ data.session_info.class_code }}</small>
+                  </td>
+                  <td class="px-4 py-4">
+                    <span class="fw-medium text-dark">{{ data.session_info.subject_name }}</span>
+                    <br />
+                    <small class="text-muted">{{ data.session_info.subject_code }}</small>
+                  </td>
+                  <td class="px-4 py-4 text-center">
+                    <span class="badge bg-primary px-3 py-2 fs-6"> {{ port }} </span>
+                  </td>
+                  <td class="px-4 py-4 text-center">
+                    <div class="fw-bold text-success mb-1">{{ data.status.attendance_count }}/{{ data.status.total_students }}</div>
+                    <div class="progress" style="height: 6px">
+                      {% set percentage = (data.status.attendance_count / data.status.total_students * 100) if data.status.total_students > 0 else 0 %}
+                      <div class="progress-bar bg-success" style="width: {{ percentage }}%"></div>
+                    </div>
+                    <small class="text-muted">{{ "%.0f"|format(percentage) }}%</small>
+                  </td>
+                  <td class="px-4 py-4 text-center">
+                    <div class="btn-group" role="group">
+                      <a href="{{ data.url }}" target="_blank" class="btn btn-outline-primary btn-sm hover-lift"> <i class="bi bi-eye me-1"></i>Xem </a>
+                      <form method="POST" action="{{ url_for('attendance.stop_auto_session', port=port) }}" style="display: inline">
+                        <button type="submit" class="btn btn-outline-danger btn-sm hover-lift" onclick="return confirm('Bạn có chắc chắn muốn dừng ca điểm danh này?')"><i class="bi bi-stop-circle me-1"></i>Dừng</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <!-- No Active Sessions -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card glass-card shadow-strong fade-in">
+        <div class="card-body text-center py-5">
+          <div class="mb-4">
+            <i class="bi bi-camera-video-off icon-chart" style="font-size: 5rem; opacity: 0.4"></i>
+          </div>
+          <h4 class="text-muted mb-3 fw-bold">Không có ca điểm danh nào đang hoạt động</h4>
+          <p class="text-muted mb-4 fs-5">Tạo ca điểm danh tự động để bắt đầu nhận diện khuôn mặt</p>
+          <a href="{{ url_for('attendance.create_auto_session') }}" class="btn btn-primary btn-lg shadow-medium hover-lift px-5 py-3"> <i class="bi bi-plus-circle-fill icon-plus me-2"></i>Tạo ca điểm danh mới </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  // Auto refresh every 5 seconds
+  setInterval(function () {
+    location.reload();
+  }, 5000);
+
+  // Add animation class on load
+  document.addEventListener("DOMContentLoaded", function () {
+    const progressBars = document.querySelectorAll(".progress-bar");
+    progressBars.forEach((bar) => {
+      const width = bar.style.width;
+      bar.style.width = "0%";
+      setTimeout(() => {
+        bar.style.transition = "width 1s ease-in-out";
+        bar.style.width = width;
+      }, 100);
+    });
+  });
+</script>
+{% endblock %}

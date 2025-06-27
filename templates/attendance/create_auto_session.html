@@ -1,0 +1,293 @@
+{% extends "base.html" %} {% block title %}Tạo Ca Điểm Danh Tự Động{% endblock %} {% block content %}
+<div class="container-fluid py-4">
+  <!-- Header -->
+  <div class="row mb-4">
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // Set current date and time
+    const now = new Date();
+    document.getElementById("session_date").value = now.toISOString().split("T")[0];
+    document.getElementById("start_time").value = now.toTimeString().slice(0, 5);
+
+    // Form submission
+    document.getElementById("autoSessionForm").addEventListener("submit", function (e) {
+        const createBtn = document.getElementById("createBtn");
+        const sessionName = document.getElementById("session_name").value.trim();
+        const subjectId = document.getElementById("subject_id").value;
+        const classId = document.getElementById("class_id").value;
+        
+        // Validation
+        if (!sessionName || !subjectId || !classId) {
+            e.preventDefault();
+            alert("⚠️ Vui lòng điền đầy đủ thông tin!");
+            return;
+        }
+        
+        // Show loading state
+        createBtn.innerHTML = '<i class="bi bi-hourglass-split me-2 spin"></i>Đang tạo ca...';
+        createBtn.disabled = true;
+        
+        // Show success message after form submission
+        setTimeout(() => {
+            if (!e.defaultPrevented) {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-info alert-dismissible fade show position-fixed';
+                alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 350px;';
+                alertDiv.innerHTML = `
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <strong>Đang tạo ca điểm danh...</strong><br>
+                    Hệ thống sẽ tự động mở browser khi hoàn tất.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.body.appendChild(alertDiv);
+            }
+        }, 100);
+    });
+    
+    // Preview functionality
+    function updatePreview() {
+        const sessionName = document.getElementById("session_name").value;
+        const subject = document.getElementById("subject_id").selectedOptions[0]?.text || 'Chưa chọn';
+        const classInfo = document.getElementById("class_id").selectedOptions[0]?.text || 'Chưa chọn';
+        const date = document.getElementById("session_date").value;
+        const time = document.getElementById("start_time").value;
+        
+        // Create preview if not exists
+        if (!document.getElementById('preview-section')) {
+            const previewHTML = `
+                <div id="preview-section" class="mt-4 p-3 bg-light rounded">
+                    <h6><i class="bi bi-eye me-2"></i>Xem trước:</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <small class="text-muted">Tên ca:</small><br>
+                            <span id="preview-name">${sessionName || 'Chưa nhập'}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <small class="text-muted">Môn học:</small><br>
+                            <span id="preview-subject">${subject}</span>
+                        </div>
+                        <div class="col-md-6 mt-2">
+                            <small class="text-muted">Lớp:</small><br>
+                            <span id="preview-class">${classInfo}</span>
+                        </div>
+                        <div class="col-md-6 mt-2">
+                            <small class="text-muted">Thời gian:</small><br>
+                            <span id="preview-datetime">${date} ${time}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.querySelector('hr.my-4').insertAdjacentHTML('beforebegin', previewHTML);
+        } else {
+            document.getElementById('preview-name').textContent = sessionName || 'Chưa nhập';
+            document.getElementById('preview-subject').textContent = subject;
+            document.getElementById('preview-class').textContent = classInfo;
+            document.getElementById('preview-datetime').textContent = `${date} ${time}`;
+        }
+    }
+    
+    // Add event listeners for preview
+    ['session_name', 'subject_id', 'class_id', 'session_date', 'start_time'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updatePreview);
+        document.getElementById(id).addEventListener('change', updatePreview);
+    });
+    
+    // Initial preview
+    updatePreview();
+});
+</script>"col-12">
+      <div class="card bg-gradient-primary shadow-lg">
+        <div class="card-body text-white">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-robot fs-1 me-3 text-warning icon-glow"></i>
+            <div>
+              <h2 class="mb-1">
+                <i class="bi bi-plus-circle-fill me-2"></i>
+                Tạo Ca Điểm Danh Tự Động
+              </h2>
+              <p class="mb-0 opacity-8">Hệ thống sẽ tự động mở port mới để điểm danh liên tục</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card shadow-lg glass-card">
+        <div class="card-header bg-gradient-secondary text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-gear-fill me-2"></i>
+            Cấu Hình Ca Điểm Danh
+          </h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" id="autoSessionForm">
+            <div class="row">
+              <!-- Tên ca điểm danh -->
+              <div class="col-md-6 mb-3">
+                <label for="session_name" class="form-label">
+                  <i class="bi bi-tag-fill text-primary me-2"></i>
+                  Tên Ca Điểm Danh
+                </label>
+                <input type="text" class="form-control form-control-lg" id="session_name" name="session_name" placeholder="VD: Điểm danh lập trình Python" required />
+              </div>
+
+              <!-- Môn học -->
+              <div class="col-md-6 mb-3">
+                <label for="subject_id" class="form-label">
+                  <i class="bi bi-book-fill text-success me-2"></i>
+                  Môn Học
+                </label>
+                <select class="form-select form-select-lg" id="subject_id" name="subject_id" required>
+                  <option value="">Chọn môn học</option>
+                  {% for subject in subjects %}
+                  <option value="{{ subject.id }}">{{ subject.subject_code }} - {{ subject.subject_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Lớp học -->
+              <div class="col-md-6 mb-3">
+                <label for="class_id" class="form-label">
+                  <i class="bi bi-people-fill text-info me-2"></i>
+                  Lớp Học
+                </label>
+                <select class="form-select form-select-lg" id="class_id" name="class_id" required>
+                  <option value="">Chọn lớp học</option>
+                  {% for class in classes %}
+                  <option value="{{ class.id }}">{{ class.class_code }} - {{ class.class_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Ngày điểm danh -->
+              <div class="col-md-6 mb-3">
+                <label for="session_date" class="form-label">
+                  <i class="bi bi-calendar-fill text-warning me-2"></i>
+                  Ngày Điểm Danh
+                </label>
+                <input type="date" class="form-control form-control-lg" id="session_date" name="session_date" required />
+              </div>
+
+              <!-- Giờ bắt đầu -->
+              <div class="col-md-6 mb-3">
+                <label for="start_time" class="form-label">
+                  <i class="bi bi-clock-fill text-danger me-2"></i>
+                  Giờ Bắt Đầu
+                </label>
+                <input type="time" class="form-control form-control-lg" id="start_time" name="start_time" required />
+              </div>
+            </div>
+
+            <hr class="my-4" />
+
+            <!-- Buttons -->
+            <div class="d-flex justify-content-between">
+              <a href="{{ url_for('attendance.list_sessions') }}" class="btn btn-secondary btn-lg">
+                <i class="bi bi-arrow-left me-2"></i>
+                Quay Lại
+              </a>
+
+              <button type="submit" class="btn btn-gradient-primary btn-lg px-5" id="createBtn">
+                <i class="bi bi-rocket-takeoff me-2"></i>
+                Tạo & Khởi Động
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="col-lg-4">
+      <div class="card shadow-lg glass-card">
+        <div class="card-header bg-gradient-info text-white">
+          <h6 class="mb-0">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            Hướng Dẫn Sử Dụng
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="timeline">
+            <div class="timeline-item">
+              <div class="timeline-marker bg-primary"></div>
+              <div class="timeline-content">
+                <h6 class="text-primary">Bước 1</h6>
+                <p class="mb-0">Điền thông tin ca điểm danh</p>
+              </div>
+            </div>
+
+            <div class="timeline-item">
+              <div class="timeline-marker bg-success"></div>
+              <div class="timeline-content">
+                <h6 class="text-success">Bước 2</h6>
+                <p class="mb-0">Hệ thống tạo port riêng và mở browser</p>
+              </div>
+            </div>
+
+            <div class="timeline-item">
+              <div class="timeline-marker bg-warning"></div>
+              <div class="timeline-content">
+                <h6 class="text-warning">Bước 3</h6>
+                <p class="mb-0">Sinh viên điểm danh trước camera</p>
+              </div>
+            </div>
+
+            <div class="timeline-item">
+              <div class="timeline-marker bg-danger"></div>
+              <div class="timeline-content">
+                <h6 class="text-danger">Bước 4</h6>
+                <p class="mb-0">Admin dừng ca khi hoàn tất</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-info mt-3">
+            <i class="bi bi-lightbulb-fill me-2"></i>
+            <strong>Lưu ý:</strong> Mỗi ca sẽ chạy trên port riêng biệt và có thể điểm danh liên tục.
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Sessions -->
+      <div class="card shadow-lg glass-card mt-4">
+        <div class="card-header bg-gradient-warning text-white">
+          <h6 class="mb-0">
+            <i class="bi bi-activity me-2"></i>
+            Ca Đang Hoạt Động
+          </h6>
+        </div>
+        <div class="card-body">
+          <p class="text-muted mb-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Kiểm tra các ca đang chạy:
+          </p>
+          <a href="{{ url_for('attendance.auto_session_manager') }}" class="btn btn-warning btn-sm w-100">
+            <i class="bi bi-eye me-2"></i>
+            Xem Quản Lý Ca Tự Động
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // Set current date and time
+    const now = new Date();
+    document.getElementById("session_date").value = now.toISOString().split("T")[0];
+    document.getElementById("start_time").value = now.toTimeString().slice(0, 5);
+
+    // Form submission
+    document.getElementById("autoSessionForm").addEventListener("submit", function (e) {
+      const createBtn = document.getElementById("createBtn");
+      createBtn.innerHTML = '<i class="bi bi-hourglass-split me-2 spin"></i>Đang tạo...';
+      createBtn.disabled = true;
+    });
+  });
+</script>
+{% endblock %}
