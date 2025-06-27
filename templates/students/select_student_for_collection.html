@@ -1,0 +1,108 @@
+{% extends "base.html" %} {% block title %}Chọn sinh viên thu thập dữ liệu{% endblock %} {% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card glass-card">
+        <div class="card-header bg-gradient-primary text-white">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-camera-fill me-2 fs-4"></i>
+            <div>
+              <h5 class="mb-0">Thu thập dữ liệu khuôn mặt</h5>
+              <small>Chọn sinh viên để thu thập dữ liệu khuôn mặt</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Hướng dẫn:</strong> Chọn sinh viên từ danh sách bên dưới để bắt đầu thu thập dữ liệu khuôn mặt. Mỗi sinh viên cần thu thập ít nhất 20-30 ảnh từ các góc độ khác nhau.
+          </div>
+
+          <div class="row">
+            {% for student in students %}
+            <div class="col-md-6 col-lg-4 mb-3">
+              <div class="card student-card h-100">
+                <div class="card-body text-center">
+                  <div class="avatar-wrapper mb-3">
+                    {% if student.photo_path %}
+                    <img src="{{ url_for('static', filename='uploads/' + student.photo_path) }}" alt="{{ student.full_name }}" class="avatar-image" />
+                    {% else %}
+                    <div class="avatar-placeholder">
+                      <i class="bi bi-person-circle fs-1 text-muted"></i>
+                    </div>
+                    {% endif %}
+                  </div>
+
+                  <h6 class="card-title">{{ student.full_name }}</h6>
+                  <p class="card-text text-muted">
+                    <small>{{ student.student_id }}</small><br />
+                    <small>{{ student.class_name }}</small>
+                  </p>
+
+                  <a href="{{ url_for('students.collect_face_data', student_id=student.id) }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-camera me-1"></i>
+                    Thu thập dữ liệu
+                  </a>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          {% if not students %}
+          <div class="text-center py-5">
+            <i class="bi bi-person-x fs-1 text-muted"></i>
+            <h5 class="text-muted mt-3">Chưa có sinh viên nào</h5>
+            <p class="text-muted">Vui lòng thêm sinh viên trước khi thu thập dữ liệu.</p>
+            <a href="{{ url_for('students.add_student') }}" class="btn btn-primary">
+              <i class="bi bi-plus-circle me-1"></i>
+              Thêm sinh viên
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .student-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .student-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .avatar-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto;
+  }
+
+  .avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #e9ecef;
+  }
+
+  .avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f8f9fa;
+    border-radius: 50%;
+    border: 3px solid #e9ecef;
+  }
+</style>
+{% endblock %}

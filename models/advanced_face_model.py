@@ -173,8 +173,8 @@ class AdvancedFaceModel:
             self.logger.error(f"Error saving model: {e}")
             return False
     
-    def train_model(self, faces_dir="uploads/faces"):
-        """Train model với ensemble của nhiều classifiers"""
+    def train_model(self, faces_dir="uploads/faces", use_augmentation=True):
+        """Train model với ensemble của nhiều classifiers và data augmentation"""
         try:
             if not os.path.exists(faces_dir):
                 return {"success": False, "message": "Thư mục faces không tồn tại"}
@@ -182,6 +182,7 @@ class AdvancedFaceModel:
             all_features = []
             all_labels = []
             student_info = {}
+            augmentation_stats = {}
             
             # Get student info from database
             conn = sqlite3.connect('attendance_system.db')
@@ -194,13 +195,23 @@ class AdvancedFaceModel:
                 if not os.path.exists(student_folder):
                     continue
                 
+                # Tạo augmented data nếu được yêu cầu
+                if use_augmentation:
+                    self.logger.info(f"Creating augmented data for student {student_id}")
+                    augment_success = self.create_augmented_dataset(
+                        student_id, student_folder, num_augmentations_per_image=2
+                    )
+                    augmentation_stats[student_id] = augment_success
+                
                 student_features = []
                 image_files = [f for f in os.listdir(student_folder) 
                              if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
                 
                 if len(image_files) < 3:  # Cần ít nhất 3 ảnh
+                    self.logger.warning(f"Student {student_id} has only {len(image_files)} images, need at least 3")
                     continue
                 
+                processed_count = 0
                 for img_file in image_files:
                     img_path = os.path.join(student_folder, img_file)
                     img = cv2.imread(img_path)
@@ -230,18 +241,22 @@ class AdvancedFaceModel:
                     
                     face_roi = gray[y:y+h, x:x+w]
                     
-                    # Generate augmented images for better training
-                    augmented_faces = self.augment_image(face_roi, num_augmentations=3)
-                    
-                    for aug_face in augmented_faces:
-                        features = self.extract_advanced_features(aug_face)
-                        if features is not None and len(features) > 0:
-                            student_features.append(features)
+                    # Extract features directly from face
+                    features = self.extract_advanced_features(face_roi)
+                    if features is not None and len(features) > 0:
+                        student_features.append(features)
+                        processed_count += 1
                 
-                if len(student_features) >= 5:  # Cần ít nhất 5 features (bao gồm augmented)
+                if len(student_features) >= 3:  # Cần ít nhất 3 features
                     all_features.extend(student_features)
                     all_labels.extend([student_id] * len(student_features))
-                    student_info[student_id] = {"name": full_name, "image_count": len(student_features)}
+                    student_info[student_id] = {
+                        "name": full_name, 
+                        "image_count": len(student_features),
+                        "processed_count": processed_count,
+                        "total_files": len(image_files)
+                    }
+                    self.logger.info(f"Student {student_id}: processed {processed_count}/{len(image_files)} images")
             
             conn.close()
             
@@ -371,15 +386,21 @@ class AdvancedFaceModel:
             self.is_trained = True
             self.save_model()
             
+            # Thống kê augmentation
+            augmented_students = sum(1 for success in augmentation_stats.values() if success)
+            
             return {
                 "success": True,
-                "message": f"Training thành công với {len(X)} features từ {len(student_info)} sinh viên",
+                "message": f"Training thành công với {len(X)} features từ {len(student_info)} sinh viên. " + 
+                          (f"Đã tạo dữ liệu augmented cho {augmented_students}/{len(augmentation_stats)} sinh viên." if use_augmentation and augmentation_stats else ""),
                 "student_count": len(student_info),
                 "feature_count": len(X),
                 "train_accuracy": float(train_score),
                 "test_accuracy": float(test_score),
                 "cv_mean_accuracy": cv_mean,
                 "cv_std_accuracy": cv_std,
+                "augmentation_enabled": use_augmentation,
+                "augmented_students": augmented_students if use_augmentation else 0,
                 "students": student_info
             }
             
@@ -778,6 +799,46 @@ class AdvancedFaceModel:
         is_valid = quality_score >= self.face_quality_threshold
         
         return quality_score, is_valid, reasons
+    
+    def create_augmented_dataset(self, student_id, original_images_path, num_augmentations_per_image=3):
+        """
+        Tạo dataset augmented cho một sinh viên
+        Args:
+            student_id: Mã sinh viên
+            original_images_path: Đường dẫn thư mục chứa ảnh gốc
+            num_augmentations_per_image: Số ảnh biến thể cho mỗi ảnh gốc
+        Returns:
+            bool: True nếu thành công
+        """
+        import cv2, os, numpy as np
+        try:
+            if not os.path.exists(original_images_path):
+                self.logger.warning(f"Path not found: {original_images_path}")
+                return False
+            image_files = [f for f in os.listdir(original_images_path)
+                          if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+            if not image_files:
+                self.logger.warning(f"No images found in {original_images_path}")
+                return False
+            augmented_count = 0
+            for image_file in image_files:
+                image_path = os.path.join(original_images_path, image_file)
+                image = cv2.imread(image_path)
+                if image is None:
+                    continue
+                augmented_images = self.augment_image(image, num_augmentations_per_image)
+                for i, aug_img in enumerate(augmented_images[1:]):  # Bỏ ảnh gốc
+                    base_name = os.path.splitext(image_file)[0]
+                    aug_filename = f"{base_name}_aug_{i+1}.jpg"
+                    aug_path = os.path.join(original_images_path, aug_filename)
+                    if not os.path.exists(aug_path):
+                        cv2.imwrite(aug_path, aug_img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                        augmented_count += 1
+            self.logger.info(f"Created {augmented_count} augmented images for student {student_id}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error creating augmented dataset: {e}")
+            return False
 
 # Create global instance (for backward compatibility)
 face_model = AdvancedFaceModel()

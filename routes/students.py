@@ -272,3 +272,36 @@ def api_student_faces(student_id):
             'success': False,
             'message': 'Không tìm thấy sinh viên'
         })
+
+@students_bp.route('/collect_face_data')
+@students_bp.route('/collect_face_data/<int:student_id>')
+def collect_face_data(student_id=None):
+    """Trang thu thập dữ liệu khuôn mặt"""
+    conn = get_db_connection()
+    
+    if student_id:
+        # Thu thập cho sinh viên cụ thể
+        student = conn.execute('''
+            SELECT s.*, c.class_name, c.class_code
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            WHERE s.id = ?
+        ''', (student_id,)).fetchone()
+        
+        if not student:
+            flash('Không tìm thấy sinh viên!', 'error')
+            return redirect(url_for('students.collect_face_data'))
+        
+        conn.close()
+        return render_template('students/collect_face_data.html', student=student)
+    else:
+        # Hiển thị danh sách sinh viên để chọn
+        students = conn.execute('''
+            SELECT s.*, c.class_name, c.class_code
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            ORDER BY c.class_name, s.full_name
+        ''').fetchall()
+        
+        conn.close()
+        return render_template('students/select_student_for_collection.html', students=students)

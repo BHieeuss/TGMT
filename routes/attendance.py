@@ -1,3 +1,8 @@
+"""
+Routes cho chức năng điểm danh
+Bao gồm: Quản lý ca điểm danh, Điểm danh thủ công, Điểm danh AI, Điểm danh tự động
+"""
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from models.database import get_db_connection
 import cv2
@@ -13,6 +18,10 @@ import threading
 import time
 
 attendance_bp = Blueprint('attendance', __name__)
+
+# ================================
+# 1. QUẢN LÝ CA ĐIỂM DANH
+# ================================
 
 @attendance_bp.route('/sessions')
 def list_sessions():
@@ -96,6 +105,207 @@ def session_detail(session_id):
     return render_template('attendance/session_detail.html', 
                          session=session, 
                          students_attendance=students_attendance)
+
+@attendance_bp.route('/sessions/<int:session_id>/delete', methods=['POST'])
+def delete_session(session_id):
+    """Xóa ca điểm danh"""
+    conn = get_db_connection()
+    
+    # Xóa các bản ghi điểm danh trước
+    conn.execute('DELETE FROM attendance_records WHERE session_id = ?', (session_id,))
+    
+    # Xóa ca điểm danh
+    conn.execute('DELETE FROM attendance_sessions WHERE id = ?', (session_id,))
+    conn.commit()
+    conn.close()
+    
+    flash('Xóa ca điểm danh thành công!', 'success')
+    return redirect(url_for('attendance.list_sessions'))
+
+# ================================
+# 2. ĐIỂM DANH BẰNG NHẬN DIỆN AI
+# ================================
+
+@attendance_bp.route('/collect_face_data/<int:student_id>')
+def collect_face_data(student_id):
+    """Trang thu thập dữ liệu khuôn mặt cho sinh viên"""
+    conn = get_db_connection()
+    
+    student = conn.execute('''
+        SELECT s.*, c.class_name, c.class_code
+        FROM students s
+        JOIN classes c ON s.class_id = c.id
+        WHERE s.id = ?
+    ''', (student_id,)).fetchone()
+    
+    if not student:
+        flash('Không tìm thấy sinh viên!', 'error')
+        return redirect(url_for('students.list_students'))
+    
+    conn.close()
+    return render_template('students/collect_face_data.html', student=student)
+
+@attendance_bp.route('/api/capture_face', methods=['POST'])
+def capture_face():
+    """API thu thập và lưu dữ liệu khuôn mặt với xử lý ảnh cao cấp"""
+    try:
+        data = request.get_json()
+        student_id = data.get('student_id')
+        image_data = data.get('image')
+        
+        if not student_id or not image_data:
+            return jsonify({'success': False, 'message': 'Thiếu dữ liệu'})
+        
+        # Decode base64 image
+        image_data = image_data.split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return jsonify({'success': False, 'message': 'Không thể đọc ảnh'})
+        
+        # Get student info
+        conn = get_db_connection()
+        student = conn.execute('SELECT student_id FROM students WHERE id = ?', (student_id,)).fetchone()
+        conn.close()
+        
+        if not student:
+            return jsonify({'success': False, 'message': 'Không tìm thấy sinh viên'})
+        
+        student_code = student['student_id']
+        
+        # Create directory if not exists
+        import os
+        face_dir = os.path.join('uploads', 'faces', student_code)
+        os.makedirs(face_dir, exist_ok=True)
+        
+        # Count existing images
+        existing_files = [f for f in os.listdir(face_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+        next_number = len(existing_files) + 1
+        
+        # Generate filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{student_code}_{next_number:03d}_{timestamp}.jpg"
+        filepath = os.path.join(face_dir, filename)
+        
+        # ============= XỨLÝ ẢNH CAO CẤP =============
+        
+        # 1. Detect face với accuracy cao hơn
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
+        # Cải thiện detection với nhiều scale
+        faces = face_cascade.detectMultiScale(
+            gray, 
+            scaleFactor=1.05,  # Tăng độ chính xác
+            minNeighbors=5,    # Giảm false positive
+            minSize=(80, 80),  # Kích thước tối thiểu
+            maxSize=(400, 400) # Kích thước tối đa
+        )
+        
+        if len(faces) == 0:
+            return jsonify({'success': False, 'message': 'Không phát hiện khuôn mặt trong ảnh. Vui lòng đảm bảo khuôn mặt rõ nét và đủ sáng.'})
+        
+        if len(faces) > 1:
+            return jsonify({'success': False, 'message': 'Phát hiện nhiều khuôn mặt, vui lòng chỉ có 1 người trong ảnh'})
+        
+        # 2. Lấy khuôn mặt lớn nhất (closest to camera)
+        face = max(faces, key=lambda f: f[2] * f[3])  # Sort by area
+        x, y, w, h = face
+        
+        # 3. Mở rộng vùng crop để có thêm context (20% padding)
+        padding = int(min(w, h) * 0.2)
+        x_start = max(0, x - padding)
+        y_start = max(0, y - padding)
+        x_end = min(img.shape[1], x + w + padding)
+        y_end = min(img.shape[0], y + h + padding)
+        
+        # 4. Crop face region
+        face_img = img[y_start:y_end, x_start:x_end]
+        
+        if face_img.size == 0:
+            return jsonify({'success': False, 'message': 'Lỗi khi crop khuôn mặt'})
+        
+        # 5. Kiểm tra chất lượng ảnh (blur detection)
+        gray_face = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
+        blur_score = cv2.Laplacian(gray_face, cv2.CV_64F).var()
+        
+        if blur_score < 100:  # Threshold for blur
+            return jsonify({'success': False, 'message': 'Ảnh bị mờ, vui lòng chụp lại với khuôn mặt rõ nét hơn'})
+        
+        # 6. Chuẩn hóa kích thước face (224x224 - chuẩn cho deep learning)
+        face_resized = cv2.resize(face_img, (224, 224), interpolation=cv2.INTER_LANCZOS4)
+        
+        # 7. Cải thiện chất lượng ảnh
+        # Cân bằng histogram cho độ sáng đều
+        lab = cv2.cvtColor(face_resized, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        l = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4,4)).apply(l)
+        enhanced = cv2.merge([l, a, b])
+        face_enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+        
+        # 8. Tăng độ sắc nét nhẹ
+        kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+        face_sharpened = cv2.filter2D(face_enhanced, -1, kernel)
+        face_final = cv2.addWeighted(face_enhanced, 0.7, face_sharpened, 0.3, 0)
+        
+        # 9. Kiểm tra brightness
+        mean_brightness = np.mean(cv2.cvtColor(face_final, cv2.COLOR_BGR2GRAY))
+        if mean_brightness < 50:
+            return jsonify({'success': False, 'message': 'Ảnh quá tối, vui lòng chụp ở nơi có đủ ánh sáng'})
+        elif mean_brightness > 200:
+            return jsonify({'success': False, 'message': 'Ảnh quá sáng, vui lòng tránh ánh sáng trực tiếp'})
+        
+        # 10. Save processed image với chất lượng cao
+        cv2.imwrite(filepath, face_final, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Đã lưu ảnh {next_number} (chất lượng: {blur_score:.0f}, độ sáng: {mean_brightness:.0f})',
+            'filename': filename,
+            'total_images': next_number,
+            'quality_info': {
+                'blur_score': round(blur_score, 1),
+                'brightness': round(mean_brightness, 1),
+                'face_size': f"{w}x{h}",
+                'processed_size': "224x224"
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
+
+@attendance_bp.route('/api/train_model', methods=['POST'])
+def train_model():
+    """API train model AI với dữ liệu khuôn mặt đã thu thập"""
+    try:
+        from models.advanced_face_model import face_model
+        
+        # Start training in background
+        import threading
+        
+        def train_in_background():
+            try:
+                result = face_model.train_model()
+                if result['success']:
+                    print(f"✅ Training completed: {result['message']}")
+                else:
+                    print(f"❌ Training failed: {result['message']}")
+            except Exception as e:
+                print(f"❌ Training error: {e}")
+        
+        training_thread = threading.Thread(target=train_in_background)
+        training_thread.daemon = True
+        training_thread.start()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Đã bắt đầu train model. Quá trình này có thể mất vài phút...'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
 
 @attendance_bp.route('/face_recognition/<int:session_id>')
 def face_recognition_page(session_id):
@@ -276,6 +486,10 @@ def recognize_face():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
 
+# ================================
+# 3. ĐIỂM DANH THỦ CÔNG
+# ================================
+
 @attendance_bp.route('/api/manual_attendance', methods=['POST'])
 def manual_attendance():
     """API điểm danh thủ công bằng MSSV"""
@@ -318,7 +532,6 @@ def manual_attendance():
         conn.execute('''
             INSERT INTO attendance_records (session_id, student_id, status, method)
             VALUES (?, ?, 'present', 'manual')
-            VALUES (?, ?, 'present', 'manual')
         ''', (session_id, student['id']))
         conn.commit()
         conn.close()
@@ -335,63 +548,14 @@ def manual_attendance():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
 
-@attendance_bp.route('/sessions/<int:session_id>/delete', methods=['POST'])
-def delete_session(session_id):
-    """Xóa ca điểm danh"""
-    conn = get_db_connection()
-    
-    # Xóa các bản ghi điểm danh trước
-    conn.execute('DELETE FROM attendance_records WHERE session_id = ?', (session_id,))
-    
-    # Xóa ca điểm danh
-    conn.execute('DELETE FROM attendance_sessions WHERE id = ?', (session_id,))
-    conn.commit()
-    conn.close()
-    
-    flash('Xóa ca điểm danh thành công!', 'success')
-    return redirect(url_for('attendance.list_sessions'))
-
-@attendance_bp.route('/api/active_sessions')
-def api_active_sessions():
-    """API lấy danh sách ca điểm danh đang hoạt động"""
-    conn = get_db_connection()
-    
-    # Lấy ca điểm danh của ngày hôm nay
-    today = datetime.now().strftime('%Y-%m-%d')
-    sessions = conn.execute('''
-        SELECT ast.id, ast.session_name, ast.session_date, ast.start_time,
-               s.subject_name, c.class_name
-        FROM attendance_sessions ast
-        JOIN subjects s ON ast.subject_id = s.id
-        JOIN classes c ON ast.class_id = c.id
-        WHERE ast.session_date = ? AND ast.status = 'active'
-        ORDER BY ast.start_time
-    ''', (today,)).fetchall()
-    
-    conn.close()
-    return jsonify([dict(row) for row in sessions])
-
-@attendance_bp.route('/api/session_attendance/<int:session_id>')
-def api_session_attendance(session_id):
-    """API lấy danh sách điểm danh của ca"""
-    conn = get_db_connection()
-    
-    attendance = conn.execute('''
-        SELECT ar.attendance_time, ar.method,
-               s.student_id, s.full_name
-        FROM attendance_records ar
-        JOIN students s ON ar.student_id = s.id
-        WHERE ar.session_id = ?
-        ORDER BY ar.attendance_time DESC
-    ''', (session_id,)).fetchall()
-    
-    conn.close()
-    return jsonify([dict(row) for row in attendance])
-
 @attendance_bp.route('/camera')
 def camera():
     """Trang điểm danh bằng camera"""
     return render_template('camera.html')
+
+# ================================
+# 4. ĐIỂM DANH TỰ ĐỘNG
+# ================================
 
 @attendance_bp.route('/sessions/create_auto', methods=['GET', 'POST'])
 def create_auto_session():

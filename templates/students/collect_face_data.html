@@ -1,0 +1,670 @@
+{% extends "base.html" %} {% block title %}Thu thập dữ liệu khuôn mặt - {{ student.full_name }}{% endblock %} {% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card glass-card">
+        <div class="card-header bg-gradient-primary text-white">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-camera-fill me-2 fs-4"></i>
+            <div>
+              <h5 class="mb-0">Thu thập dữ liệu khuôn mặt</h5>
+              <small>{{ student.full_name }} - {{ student.student_id }}</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="row">
+            <!-- Camera Preview -->
+            <div class="col-lg-8">
+              <div class="camera-container mb-4">
+                <div class="video-wrapper">
+                  <video id="video" autoplay muted class="video-preview"></video>
+                  <canvas id="canvas" style="display: none"></canvas>
+                </div>
+
+                <div class="camera-controls mt-3">
+                  <button id="startCamera" class="btn btn-primary me-2"><i class="bi bi-camera-video"></i> Bật Camera</button>
+                  <button id="startCollectionBtn" class="btn btn-gradient me-2" disabled><i class="bi bi-magic"></i> Bắt đầu thu thập 40 ảnh</button>
+                  <button id="stopCollectionBtn" class="btn btn-danger me-2" disabled style="display: none"><i class="bi bi-stop-circle"></i> Dừng thu thập</button>
+                  <button id="trainBtn" class="btn btn-warning" disabled><i class="bi bi-cpu"></i> Train Model</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Instructions & Status -->
+            <div class="col-lg-4">
+              <div class="instructions-panel">
+                <h6 class="text-primary">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Hướng dẫn thu thập
+                </h6>
+                <div class="instruction-steps">
+                  <div class="step">
+                    <span class="step-number">1</span>
+                    <span>Bật camera và đảm bảo khuôn mặt hiển thị rõ ràng, đủ sáng</span>
+                  </div>
+                  <div class="step">
+                    <span class="step-number">2</span>
+                    <span>Nhấn "Bắt đầu thu thập" để tự động chụp 40 ảnh</span>
+                  </div>
+                  <div class="step">
+                    <span class="step-number">3</span>
+                    <span>Trong quá trình chụp: xoay đầu trái, phải, lên, xuống</span>
+                  </div>
+                  <div class="step">
+                    <span class="step-number">4</span>
+                    <span>Thay đổi biểu cảm: cười, nghiêm túc, bình thường</span>
+                  </div>
+                  <div class="step">
+                    <span class="step-number">5</span>
+                    <span>Đợi thu thập xong rồi nhấn "Train Model"</span>
+                  </div>
+                </div>
+
+                <div class="status-panel mt-4">
+                  <h6 class="text-info">
+                    <i class="bi bi-graph-up me-1"></i>
+                    Trạng thái
+                  </h6>
+                  <div id="statusMessages" class="status-messages">
+                    <div class="alert alert-info">
+                      <i class="bi bi-info-circle me-1"></i>
+                      Sẵn sàng thu thập dữ liệu
+                    </div>
+                  </div>
+                </div>
+
+                <div class="progress-panel mt-3">
+                  <h6 class="text-success">
+                    <i class="bi bi-collection me-1"></i>
+                    Tiến độ thu thập
+                  </h6>
+                  <div class="progress mb-2">
+                    <div id="progressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                  </div>
+                  <small class="text-muted"> <span id="imageCountText">0</span>/40 ảnh đã thu thập </small>
+                </div>
+
+                <!-- Panel thông tin chất lượng ảnh -->
+                <div class="quality-panel mt-3" id="qualityPanel" style="display: none">
+                  <h6 class="text-primary">
+                    <i class="bi bi-speedometer2 me-1"></i>
+                    Chất lượng ảnh
+                  </h6>
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <div class="quality-metric">
+                        <small class="text-muted">Độ nét</small>
+                        <div class="d-flex align-items-center">
+                          <span id="blurScore" class="badge bg-secondary">--</span>
+                          <div class="ms-2 flex-grow-1">
+                            <div class="progress progress-sm">
+                              <div id="blurProgress" class="progress-bar bg-info" style="width: 0%"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <div class="quality-metric">
+                        <small class="text-muted">Độ sáng</small>
+                        <div class="d-flex align-items-center">
+                          <span id="brightnessScore" class="badge bg-secondary">--</span>
+                          <div class="ms-2 flex-grow-1">
+                            <div class="progress progress-sm">
+                              <div id="brightnessProgress" class="progress-bar bg-warning" style="width: 0%"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-2">
+                    <span id="qualityBadge" class="badge bg-secondary">
+                      <i class="bi bi-speedometer2 me-1"></i>
+                      Chưa đánh giá
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .camera-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .video-wrapper {
+    position: relative;
+    background: #000;
+    border-radius: 15px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+  }
+
+  .video-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 15px;
+  }
+
+  .camera-controls {
+    text-align: center;
+  }
+
+  .instructions-panel {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    height: fit-content;
+  }
+
+  .instruction-steps .step {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    border-left: 3px solid var(--bs-primary);
+  }
+
+  .step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 25px;
+    height: 25px;
+    background: var(--bs-primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+
+  .status-messages {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .status-messages .alert {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+
+  .progress-panel {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .progress-panel .progress {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+
+  .progress-sm {
+    height: 6px;
+    border-radius: 3px;
+  }
+
+  .btn {
+    transition: all 0.3s ease;
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    transform: none !important;
+  }
+
+  #startCollectionBtn {
+    background: linear-gradient(45deg, #17a2b8, #20c997);
+    border: none;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+    font-size: 1.1rem;
+    padding: 12px 24px;
+  }
+
+  #startCollectionBtn:hover:not(:disabled) {
+    background: linear-gradient(45deg, #138496, #1e7e34);
+    transform: translateY(-2px) scale(1.05);
+  }
+
+  #stopCollectionBtn {
+    background: linear-gradient(45deg, #dc3545, #fd7e14);
+    border: none;
+    font-weight: bold;
+    animation: blink 1s infinite;
+  }
+
+  .quality-panel {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .quality-metric {
+    margin-bottom: 8px;
+  }
+
+  .quality-metric .progress {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .quality-metric .badge {
+    min-width: 40px;
+    font-size: 0.7rem;
+  }
+
+  #qualityBadge {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+  }
+
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(23, 162, 184, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
+    }
+  }
+
+  @keyframes blink {
+    0%,
+    50% {
+      opacity: 1;
+    }
+    51%,
+    100% {
+      opacity: 0.7;
+    }
+  }
+</style>
+
+<script>
+  let video, canvas, context;
+  let imageCount = 0;
+  let studentId = parseInt("{{ student.id }}");
+  let isCollecting = false;
+  let collectionInterval = null;
+  let captureDelay = 100; // 100ms delay giữa các lần chụp (tương đương 4s cho 40 ảnh)
+
+  document.addEventListener("DOMContentLoaded", function () {
+    video = document.getElementById("video");
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+
+    // Event listeners
+    document.getElementById("startCamera").addEventListener("click", startCamera);
+    document.getElementById("startCollectionBtn").addEventListener("click", startCollection);
+    document.getElementById("stopCollectionBtn").addEventListener("click", stopCollection);
+    document.getElementById("trainBtn").addEventListener("click", trainModel);
+  });
+
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: 640,
+          height: 480,
+          facingMode: "user",
+        },
+      });
+
+      video.srcObject = stream;
+      video.onloadedmetadata = function () {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      };
+
+      document.getElementById("startCamera").disabled = true;
+      document.getElementById("startCollectionBtn").disabled = false;
+
+      addStatusMessage("Camera đã được bật", "success");
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      addStatusMessage("Không thể truy cập camera: " + err.message, "danger");
+    }
+  }
+
+  function startCollection() {
+    if (isCollecting) return;
+
+    isCollecting = true;
+    document.getElementById("startCollectionBtn").disabled = true;
+    document.getElementById("stopCollectionBtn").disabled = false;
+    document.getElementById("stopCollectionBtn").style.display = "inline-block";
+
+    addStatusMessage("🔄 Bắt đầu thu thập 40 ảnh! Hãy xoay đầu theo các hướng khác nhau...", "info");
+
+    let countdown = 3;
+    const countdownInterval = setInterval(() => {
+      if (countdown > 0) {
+        addStatusMessage(`⏰ Bắt đầu sau ${countdown} giây...`, "warning");
+        countdown--;
+      } else {
+        clearInterval(countdownInterval);
+
+        // Start collection
+        collectionInterval = setInterval(() => {
+          if (imageCount >= 40 || !isCollecting) {
+            stopCollection();
+            return;
+          }
+
+          captureImage(true); // true = auto mode
+        }, captureDelay);
+      }
+    }, 1000);
+  }
+
+  function stopCollection() {
+    isCollecting = false;
+
+    if (collectionInterval) {
+      clearInterval(collectionInterval);
+      collectionInterval = null;
+    }
+
+    document.getElementById("startCollectionBtn").disabled = false;
+    document.getElementById("stopCollectionBtn").disabled = true;
+    document.getElementById("stopCollectionBtn").style.display = "none";
+
+    addStatusMessage("🛑 Đã dừng thu thập", "info");
+  }
+
+  function captureImage(isAutoMode = false) {
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      addStatusMessage("Camera chưa sẵn sàng", "warning");
+      return;
+    }
+
+    // Draw video frame to canvas
+    context.drawImage(video, 0, 0);
+
+    // Convert to base64
+    const imageData = canvas.toDataURL("image/jpeg", 0.8);
+
+    // Send to server
+    fetch("/attendance/api/capture_face", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        student_id: studentId,
+        image: imageData,
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          imageCount = data.total_images;
+          updateProgress();
+
+          // Hiển thị thông tin chất lượng nếu có
+          let qualityInfo = "";
+          if (data.quality_info) {
+            const blur = data.quality_info.blur_score;
+            const brightness = data.quality_info.brightness;
+
+            // Cập nhật thông tin chất lượng ảnh
+            updateQualityInfo(data.quality_info);
+
+            // Đánh giá chất lượng
+            let qualityLevel = "";
+            let qualityIcon = "";
+            if (blur > 500 && brightness >= 80 && brightness <= 180) {
+              qualityLevel = "Tuyệt vời";
+              qualityIcon = "⭐";
+            } else if (blur > 300 && brightness >= 60 && brightness <= 200) {
+              qualityLevel = "Tốt";
+              qualityIcon = "✅";
+            } else if (blur > 150) {
+              qualityLevel = "Khá";
+              qualityIcon = "📷";
+            } else {
+              qualityLevel = "Trung bình";
+              qualityIcon = "📸";
+            }
+
+            qualityInfo = ` (${qualityIcon} ${qualityLevel} - Độ nét: ${blur.toFixed(0)}, Sáng: ${brightness.toFixed(0)})`;
+          }
+
+          if (isAutoMode) {
+            addStatusMessage(`📸 Ảnh ${imageCount}/40${qualityInfo}`, "success");
+          } else {
+            addStatusMessage(`✅ ${data.message}${qualityInfo}`, "success");
+          }
+
+          if (imageCount >= 30) {
+            document.getElementById("trainBtn").disabled = false;
+            if (!isAutoMode) {
+              addStatusMessage("🎉 Đã thu thập đủ ảnh! Có thể train model.", "info");
+            }
+          }
+
+          if (imageCount >= 40) {
+            stopCollection();
+            addStatusMessage("🎉 Hoàn thành thu thập 40 ảnh! Sẵn sàng train model.", "success");
+            // Hiển thị thống kê tổng quan
+            addStatusMessage("📊 Tất cả ảnh đã được xử lý và tối ưu hóa cho training model.", "info");
+          }
+
+          // Cập nhật thông tin chất lượng ảnh
+          updateQualityInfo(data.quality_info);
+        } else {
+          addStatusMessage(`❌ ${data.message}`, "danger");
+          if (isAutoMode) {
+            // If error during collection, slow down
+            captureDelay = Math.min(captureDelay + 200, 2000);
+            addStatusMessage(`⏱️ Tạm dừng ${captureDelay}ms để cải thiện chất lượng ảnh...`, "warning");
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        addStatusMessage("Lỗi kết nối: " + error.message, "danger");
+        if (isAutoMode) {
+          stopCollection();
+        }
+      });
+  }
+
+  function trainModel() {
+    if (imageCount < 10) {
+      addStatusMessage("Cần ít nhất 10 ảnh để train model", "warning");
+      return;
+    }
+
+    document.getElementById("trainBtn").disabled = true;
+    addStatusMessage("🔄 Đang train model...", "info");
+
+    fetch("/attendance/api/train_model", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          addStatusMessage("✅ " + data.message, "success");
+        } else {
+          addStatusMessage("❌ " + data.message, "danger");
+          document.getElementById("trainBtn").disabled = false;
+        }
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        addStatusMessage("Lỗi train model: " + error.message, "danger");
+        document.getElementById("trainBtn").disabled = false;
+      });
+  }
+
+  function updateProgress() {
+    const percentage = Math.min((imageCount / 40) * 100, 100);
+    document.getElementById("progressBar").style.width = percentage + "%";
+    document.getElementById("imageCountText").textContent = imageCount;
+
+    // Change progress bar color based on progress
+    const progressBar = document.getElementById("progressBar");
+    if (percentage < 30) {
+      progressBar.className = "progress-bar bg-danger";
+    } else if (percentage < 70) {
+      progressBar.className = "progress-bar bg-warning";
+    } else {
+      progressBar.className = "progress-bar bg-success";
+    }
+  }
+
+  // Hàm cập nhật thông tin chất lượng ảnh
+  function updateQualityInfo(qualityData) {
+    if (!qualityData) return;
+
+    const qualityPanel = document.getElementById("qualityPanel");
+    const blurScore = document.getElementById("blurScore");
+    const brightnessScore = document.getElementById("brightnessScore");
+    const blurProgress = document.getElementById("blurProgress");
+    const brightnessProgress = document.getElementById("brightnessProgress");
+    const qualityBadge = document.getElementById("qualityBadge");
+
+    // Hiển thị panel
+    qualityPanel.style.display = "block";
+
+    // Cập nhật điểm số
+    const blur = qualityData.blur_score;
+    const brightness = qualityData.brightness;
+
+    blurScore.textContent = blur.toFixed(0);
+    brightnessScore.textContent = brightness.toFixed(0);
+
+    // Cập nhật progress bars
+    // Blur score: 0-1000+ (càng cao càng tốt)
+    const blurPercent = Math.min((blur / 600) * 100, 100);
+    blurProgress.style.width = blurPercent + "%";
+
+    // Brightness: 50-200 là tốt (optimal: 80-180)
+    let brightnessPercent = 0;
+    if (brightness >= 80 && brightness <= 180) {
+      brightnessPercent = 100;
+    } else if (brightness >= 60 && brightness <= 200) {
+      brightnessPercent = 75;
+    } else if (brightness >= 50 && brightness <= 220) {
+      brightnessPercent = 50;
+    } else {
+      brightnessPercent = 25;
+    }
+    brightnessProgress.style.width = brightnessPercent + "%";
+
+    // Cập nhật progress bar colors
+    if (blurPercent >= 80) {
+      blurProgress.className = "progress-bar bg-success";
+    } else if (blurPercent >= 50) {
+      blurProgress.className = "progress-bar bg-warning";
+    } else {
+      blurProgress.className = "progress-bar bg-danger";
+    }
+
+    if (brightnessPercent >= 80) {
+      brightnessProgress.className = "progress-bar bg-success";
+    } else if (brightnessPercent >= 50) {
+      brightnessProgress.className = "progress-bar bg-warning";
+    } else {
+      brightnessProgress.className = "progress-bar bg-danger";
+    }
+
+    // Đánh giá tổng thể
+    let overallQuality = "";
+    let badgeClass = "";
+    let icon = "";
+
+    if (blur > 500 && brightness >= 80 && brightness <= 180) {
+      overallQuality = "Tuyệt vời";
+      badgeClass = "bg-success";
+      icon = "bi-star-fill";
+    } else if (blur > 300 && brightness >= 60 && brightness <= 200) {
+      overallQuality = "Tốt";
+      badgeClass = "bg-primary";
+      icon = "bi-check-circle-fill";
+    } else if (blur > 150) {
+      overallQuality = "Khá";
+      badgeClass = "bg-warning";
+      icon = "bi-camera-fill";
+    } else {
+      overallQuality = "Cần cải thiện";
+      badgeClass = "bg-danger";
+      icon = "bi-exclamation-triangle-fill";
+    }
+
+    qualityBadge.className = `badge ${badgeClass}`;
+    qualityBadge.innerHTML = `<i class="bi ${icon} me-1"></i>${overallQuality}`;
+  }
+
+  function addStatusMessage(message, type) {
+    const statusContainer = document.getElementById("statusMessages");
+    const alertDiv = document.createElement("div");
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    statusContainer.insertBefore(alertDiv, statusContainer.firstChild);
+
+    // Limit number of messages
+    const messages = statusContainer.querySelectorAll(".alert");
+    if (messages.length > 5) {
+      messages[messages.length - 1].remove();
+    }
+
+    // Auto remove after 3 seconds for auto mode messages
+    if (message.includes("📸") || message.includes("⏰")) {
+      setTimeout(() => {
+        if (alertDiv.parentNode) {
+          alertDiv.remove();
+        }
+      }, 2000);
+    } else {
+      // Auto remove after 5 seconds for other messages
+      setTimeout(() => {
+        if (alertDiv.parentNode) {
+          alertDiv.remove();
+        }
+      }, 5000);
+    }
+  }
+</script>
+{% endblock %}

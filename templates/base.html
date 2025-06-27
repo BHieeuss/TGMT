@@ -57,19 +57,13 @@
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('capture_faces') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Thu thập khuôn mặt </a>
+                  <a class="dropdown-item" href="{{ url_for('students.collect_face_data') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Thu thập khuôn mặt </a>
                 </li>
               </ul>
             </li>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="bi bi-calendar-check-fill icon-attendance me-1"></i>Điểm danh </a>
               <ul class="dropdown-menu">
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('attendance.list_sessions') }}"> <i class="bi bi-list-ul icon-list me-2"></i>Ca điểm danh </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('attendance.add_session') }}"> <i class="bi bi-plus-circle-fill icon-plus me-2"></i>Tạo ca mới </a>
-                </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
                   <a class="dropdown-item" href="{{ url_for('attendance.create_auto_session') }}"> <i class="bi bi-robot icon-ai me-2"></i>Tạo ca tự động </a>
@@ -78,12 +72,6 @@
                   <a class="dropdown-item" href="{{ url_for('attendance.auto_session_manager') }}"> <i class="bi bi-gear-fill icon-wrench me-2"></i>Quản lý ca tự động </a>
                 </li>
                 <li><hr class="dropdown-divider" /></li>
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('camera') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Điểm danh camera </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('test_camera') }}"> <i class="bi bi-tools icon-wrench me-2"></i>Test Camera </a>
-                </li>
               </ul>
             </li>
             <li class="nav-item dropdown">
@@ -103,7 +91,7 @@
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <a class="dropdown-item" href="{{ url_for('capture_faces') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Thu thập ảnh </a>
+                  <a class="dropdown-item" href="{{ url_for('students.collect_face_data') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Thu thập ảnh </a>
                 </li>
               </ul>
             </li>
