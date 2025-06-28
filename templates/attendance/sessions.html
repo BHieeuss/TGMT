@@ -1,0 +1,96 @@
+{% extends "base.html" %} {% block title %}Quản lý ca điểm danh{% endblock %} {% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Danh sách ca điểm danh</h3>
+    <a href="{{ url_for('attendance.add_session') }}" class="btn btn-primary"> <i class="bi bi-plus-circle"></i> Thêm ca mới </a>
+  </div>
+
+  <h5 class="text-success mb-2"><i class="bi bi-play-circle"></i> Ca đang hoạt động</h5>
+  <div class="table-responsive mb-4">
+    <table class="table table-bordered table-hover align-middle bg-white">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Tên ca</th>
+          <th>Môn học</th>
+          <th>Lớp</th>
+          <th>Ngày</th>
+          <th>Giờ bắt đầu</th>
+          <th>Giờ kết thúc</th>
+          <th>Số lượt điểm danh</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in active_sessions %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ s.session_name }}</td>
+          <td>{{ s.subject_name }} ({{ s.subject_code }})</td>
+          <td>{{ s.class_name }} ({{ s.class_code }})</td>
+          <td>{{ s.session_date }}</td>
+          <td>{{ s.start_time }}</td>
+          <td>{{ s.end_time or '-' }}</td>
+          <td>{{ s.attendance_count }}</td>
+          <td>
+            <a href="{{ url_for('attendance.session_detail', session_id=s.id) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i> Xem</a>
+            <a href="{{ url_for('attendance.edit_session', session_id=s.id) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i> Sửa</a>
+            <form action="{{ url_for('attendance.delete_session', session_id=s.id) }}" method="post" style="display: inline-block" onsubmit="return confirm('Bạn có chắc muốn xóa ca này?');">
+              <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Xóa</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center">Không có ca đang hoạt động.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h5 class="text-secondary mb-2"><i class="bi bi-stop-circle"></i> Ca đã ngưng hoạt động</h5>
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle bg-white">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Tên ca</th>
+          <th>Môn học</th>
+          <th>Lớp</th>
+          <th>Ngày</th>
+          <th>Giờ bắt đầu</th>
+          <th>Giờ kết thúc</th>
+          <th>Số lượt điểm danh</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in inactive_sessions %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ s.session_name }}</td>
+          <td>{{ s.subject_name }} ({{ s.subject_code }})</td>
+          <td>{{ s.class_name }} ({{ s.class_code }})</td>
+          <td>{{ s.session_date }}</td>
+          <td>{{ s.start_time }}</td>
+          <td>{{ s.end_time or '-' }}</td>
+          <td>{{ s.attendance_count }}</td>
+          <td>
+            <a href="{{ url_for('attendance.session_detail', session_id=s.id) }}" class="btn btn-sm btn-info"><i class="bi bi-eye"></i> Xem</a>
+            <a href="{{ url_for('attendance.edit_session', session_id=s.id) }}" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i> Sửa</a>
+            <form action="{{ url_for('attendance.delete_session', session_id=s.id) }}" method="post" style="display: inline-block" onsubmit="return confirm('Bạn có chắc muốn xóa ca này?');">
+              <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Xóa</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center">Không có ca đã ngưng hoạt động.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

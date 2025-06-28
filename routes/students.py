@@ -7,7 +7,183 @@ from PIL import Image
 from werkzeug.utils import secure_filename
 import json
 
+
 students_bp = Blueprint('students', __name__)
+
+# =========================
+# EXPORT ATTENDANCE EXCEL
+# =========================
+@students_bp.route('/export_attendance_excel')
+def export_attendance_excel():
+    """Xuất file Excel điểm danh cho lớp theo môn học"""
+    import pandas as pd
+    from flask import send_file
+    from datetime import datetime
+    
+    class_id = request.args.get('class_id', type=int)
+    subject_id = request.args.get('subject_id', type=int)
+    
+    if not class_id:
+        flash('Thiếu thông tin lớp!', 'error')
+        return redirect(url_for('students.list_students'))
+    
+    conn = get_db_connection()
+    
+    # Lấy thông tin lớp
+    class_info = conn.execute('SELECT * FROM classes WHERE id = ?', (class_id,)).fetchone()
+    if not class_info:
+        flash('Không tìm thấy lớp!', 'error')
+        return redirect(url_for('students.list_students'))
+    
+    # Lấy danh sách sinh viên trong lớp
+    students = conn.execute('''
+        SELECT s.id, s.student_id, s.full_name
+        FROM students s
+        WHERE s.class_id = ?
+        ORDER BY s.student_id
+    ''', (class_id,)).fetchall()
+    
+    if not students:
+        flash('Lớp này chưa có sinh viên!', 'error')
+        return redirect(url_for('students.list_students'))
+    
+    # Query attendance sessions và records
+    if subject_id:
+        # Lấy thông tin môn học
+        subject_info = conn.execute('SELECT * FROM subjects WHERE id = ?', (subject_id,)).fetchone()
+        subject_name = subject_info['subject_name'] if subject_info else 'Unknown'
+        
+        # Lấy các ca điểm danh của môn học cụ thể
+        sessions = conn.execute('''
+            SELECT id, session_date, session_name
+            FROM attendance_sessions
+            WHERE class_id = ? AND subject_id = ?
+            ORDER BY session_date
+        ''', (class_id, subject_id)).fetchall()
+        
+        # Lấy dữ liệu điểm danh với student_id (MSSV), không phải database ID
+        attendance_data = conn.execute('''
+            SELECT s.student_id as student_code, ast.session_date, ar.status
+            FROM attendance_records ar
+            JOIN attendance_sessions ast ON ar.session_id = ast.id
+            JOIN students s ON ar.student_id = s.id
+            WHERE ast.class_id = ? AND ast.subject_id = ?
+        ''', (class_id, subject_id)).fetchall()
+        
+        filename_suffix = f"{class_info['class_code']}_{subject_info['subject_code']}" if subject_info else class_info['class_code']
+    else:
+        # Lấy tất cả các ca điểm danh của lớp
+        sessions = conn.execute('''
+            SELECT ast.id, ast.session_date, ast.session_name, s.subject_name
+            FROM attendance_sessions ast
+            JOIN subjects s ON ast.subject_id = s.id
+            WHERE ast.class_id = ?
+            ORDER BY ast.session_date
+        ''', (class_id,)).fetchall()
+        
+        # Lấy tất cả dữ liệu điểm danh với student_id (MSSV), không phải database ID
+        attendance_data = conn.execute('''
+            SELECT s.student_id as student_code, ast.session_date, ar.status
+            FROM attendance_records ar
+            JOIN attendance_sessions ast ON ar.session_id = ast.id
+            JOIN students s ON ar.student_id = s.id
+            WHERE ast.class_id = ?
+        ''', (class_id,)).fetchall()
+        
+        subject_name = "Tất cả môn"
+        filename_suffix = class_info['class_code']
+    
+    conn.close()
+    
+    # Tạo DataFrame cho sinh viên
+    df_students = pd.DataFrame([{
+        'MSSV': student['student_id'],
+        'Họ và tên': student['full_name']
+    } for student in students])
+    
+    # Tạo dictionary để mapping attendance data
+    attendance_dict = {}
+    for record in attendance_data:
+        key = (record['student_code'], record['session_date'])
+        attendance_dict[key] = 'Có mặt' if record['status'] == 'present' else 'Vắng'
+    
+    # Tạo các cột ngày từ sessions
+    session_dates = sorted(set([session['session_date'] for session in sessions]))
+    
+    # Thêm cột điểm danh cho từng ngày
+    for session_date in session_dates:
+        column_name = f"Ngày {datetime.strptime(session_date, '%Y-%m-%d').strftime('%d/%m/%Y')}"
+        df_students[column_name] = df_students['MSSV'].apply(
+            lambda mssv: attendance_dict.get((mssv, session_date), 'Vắng')
+        )
+    
+    # Thống kê tổng
+    if session_dates:
+        attendance_columns = [f"Ngày {datetime.strptime(date, '%Y-%m-%d').strftime('%d/%m/%Y')}" for date in session_dates]
+        df_students['Tổng có mặt'] = df_students[attendance_columns].apply(
+            lambda row: sum(1 for val in row if val == 'Có mặt'), axis=1
+        )
+        df_students['Tổng vắng'] = df_students[attendance_columns].apply(
+            lambda row: sum(1 for val in row if val == 'Vắng'), axis=1
+        )
+        df_students['Tỷ lệ có mặt (%)'] = (df_students['Tổng có mặt'] / len(session_dates) * 100).round(1)
+    
+    # Tạo file Excel với tên file format: MaLop - Mon - Ngay
+    current_date = datetime.now().strftime('%d-%m-%Y')
+    
+    if subject_id and subject_info:
+        filename = f"{class_info['class_code']} - {subject_info['subject_code']} - {current_date}.xlsx"
+    else:
+        filename = f"{class_info['class_code']} - TatCa - {current_date}.xlsx"
+    
+    file_path = f'exports/{filename}'
+    
+    # Đảm bảo thư mục exports tồn tại
+    os.makedirs('exports', exist_ok=True)
+    
+    with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+        # Sheet 1: Dữ liệu điểm danh
+        df_students.to_excel(writer, sheet_name='Điểm danh', index=False)
+        
+        # Sheet 2: Thống kê tổng quan
+        summary_data = {
+            'Thông tin': [
+                'Lớp học',
+                'Môn học', 
+                'Tổng số sinh viên',
+                'Tổng số buổi học',
+                'Ngày xuất báo cáo'
+            ],
+            'Giá trị': [
+                f"{class_info['class_name']} ({class_info['class_code']})",
+                subject_name,
+                len(students),
+                len(session_dates),
+                datetime.now().strftime('%d/%m/%Y %H:%M')
+            ]
+        }
+        
+        df_summary = pd.DataFrame(summary_data)
+        df_summary.to_excel(writer, sheet_name='Thông tin', index=False)
+        
+        # Format Excel
+        workbook = writer.book
+        worksheet = writer.sheets['Điểm danh']
+        
+        # Auto-fit columns
+        for column in worksheet.columns:
+            max_length = 0
+            column_name = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[column_name].width = adjusted_width
+    
+    return send_file(file_path, as_attachment=True, download_name=filename)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
@@ -42,17 +218,28 @@ def encode_face(image_path):
 
 @students_bp.route('/')
 def list_students():
-    """Danh sách sinh viên"""
+    """Danh sách sinh viên, hỗ trợ lọc theo class_id (query string)"""
     conn = get_db_connection()
-    students = conn.execute('''
-        SELECT s.*, c.class_name, c.class_code
-        FROM students s
-        JOIN classes c ON s.class_id = c.id
-        ORDER BY s.created_at DESC
-    ''').fetchall()
+    class_id = request.args.get('class_id', type=int)
+    class_info = None
+    if class_id:
+        students = conn.execute('''
+            SELECT s.*, c.class_name, c.class_code
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            WHERE s.class_id = ?
+            ORDER BY s.created_at DESC
+        ''', (class_id,)).fetchall()
+        class_info = conn.execute('SELECT * FROM classes WHERE id = ?', (class_id,)).fetchone()
+    else:
+        students = conn.execute('''
+            SELECT s.*, c.class_name, c.class_code
+            FROM students s
+            JOIN classes c ON s.class_id = c.id
+            ORDER BY s.created_at DESC
+        ''').fetchall()
     conn.close()
-    
-    return render_template('students/list.html', students=students)
+    return render_template('students/list.html', students=students, class_info=class_info)
 
 @students_bp.route('/add', methods=['GET', 'POST'])
 def add_student():
@@ -305,3 +492,34 @@ def collect_face_data(student_id=None):
         
         conn.close()
         return render_template('students/select_student_for_collection.html', students=students)
+
+@students_bp.route('/by_class/<int:class_id>')
+def list_students_by_class(class_id):
+    """Danh sách sinh viên theo lớp"""
+    conn = get_db_connection()
+    students = conn.execute('''
+        SELECT s.*, c.class_name, c.class_code
+        FROM students s
+        JOIN classes c ON s.class_id = c.id
+        WHERE s.class_id = ?
+        ORDER BY s.created_at DESC
+    ''', (class_id,)).fetchall()
+    class_info = conn.execute('SELECT * FROM classes WHERE id = ?', (class_id,)).fetchone()
+    conn.close()
+    return render_template('students/list.html', students=students, class_info=class_info)
+
+# API endpoint để lấy môn học theo lớp cho modal export
+@students_bp.route('/api/subjects_by_class/<int:class_id>')
+def api_subjects_by_class(class_id):
+    """API lấy danh sách môn học có ca điểm danh cho lớp này"""
+    conn = get_db_connection()
+    subjects = conn.execute('''
+        SELECT DISTINCT s.id, s.subject_code, s.subject_name
+        FROM subjects s
+        JOIN attendance_sessions ast ON s.id = ast.subject_id
+        WHERE ast.class_id = ?
+        ORDER BY s.subject_name
+    ''', (class_id,)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(row) for row in subjects])

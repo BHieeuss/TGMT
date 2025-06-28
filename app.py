@@ -257,6 +257,23 @@ def serve_face_image(student_id, filename):
     except Exception as e:
         return f"Error: {str(e)}", 500
 
+# API routes cho subjects by class
+@app.route('/api/subjects_by_class/<int:class_id>')
+def api_subjects_by_class(class_id):
+    """API lấy danh sách môn học có ca điểm danh cho lớp này"""
+    from models.database import get_db_connection
+    conn = get_db_connection()
+    subjects = conn.execute('''
+        SELECT DISTINCT s.id, s.subject_code, s.subject_name
+        FROM subjects s
+        JOIN attendance_sessions ast ON s.id = ast.subject_id
+        WHERE ast.class_id = ?
+        ORDER BY s.subject_name
+    ''', (class_id,)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(row) for row in subjects])
+
 if __name__ == '__main__':
     # Khởi tạo database
     from models.database import init_database

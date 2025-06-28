@@ -25,21 +25,35 @@ attendance_bp = Blueprint('attendance', __name__)
 
 @attendance_bp.route('/sessions')
 def list_sessions():
-    """Danh sách ca điểm danh"""
+    """Danh sách ca điểm danh, chia thành đang hoạt động và đã ngưng hoạt động"""
     conn = get_db_connection()
-    sessions = conn.execute('''
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+    # Ca đang hoạt động: end_time chưa có hoặc lớn hơn hiện tại
+    active_sessions = conn.execute('''
         SELECT ast.*, s.subject_name, s.subject_code, c.class_name, c.class_code,
                COUNT(ar.id) as attendance_count
         FROM attendance_sessions ast
         JOIN subjects s ON ast.subject_id = s.id
         JOIN classes c ON ast.class_id = c.id
         LEFT JOIN attendance_records ar ON ast.id = ar.session_id
+        WHERE (ast.end_time IS NULL OR (ast.session_date || ' ' || ast.end_time) > ?)
         GROUP BY ast.id
         ORDER BY ast.session_date DESC, ast.start_time DESC
-    ''').fetchall()
+    ''', (now,)).fetchall()
+    # Ca đã ngưng hoạt động: end_time nhỏ hơn hiện tại
+    inactive_sessions = conn.execute('''
+        SELECT ast.*, s.subject_name, s.subject_code, c.class_name, c.class_code,
+               COUNT(ar.id) as attendance_count
+        FROM attendance_sessions ast
+        JOIN subjects s ON ast.subject_id = s.id
+        JOIN classes c ON ast.class_id = c.id
+        LEFT JOIN attendance_records ar ON ast.id = ar.session_id
+        WHERE (ast.end_time IS NOT NULL AND (ast.session_date || ' ' || ast.end_time) <= ?)
+        GROUP BY ast.id
+        ORDER BY ast.session_date DESC, ast.start_time DESC
+    ''', (now,)).fetchall()
     conn.close()
-    
-    return render_template('attendance/sessions.html', sessions=sessions)
+    return render_template('attendance/sessions.html', active_sessions=active_sessions, inactive_sessions=inactive_sessions)
 
 @attendance_bp.route('/sessions/add', methods=['GET', 'POST'])
 def add_session():
@@ -121,6 +135,41 @@ def delete_session(session_id):
     
     flash('Xóa ca điểm danh thành công!', 'success')
     return redirect(url_for('attendance.list_sessions'))
+
+@attendance_bp.route('/sessions/<int:session_id>/edit', methods=['GET', 'POST'])
+def edit_session(session_id):
+    """Sửa ca điểm danh"""
+    conn = get_db_connection()
+    session = conn.execute('SELECT * FROM attendance_sessions WHERE id = ?', (session_id,)).fetchone()
+    if not session:
+        flash('Không tìm thấy ca điểm danh!', 'error')
+        conn.close()
+        return redirect(url_for('attendance.list_sessions'))
+
+    if request.method == 'POST':
+        session_name = request.form.get('session_name')
+        subject_id = request.form.get('subject_id')
+        class_id = request.form.get('class_id')
+        session_date = request.form.get('session_date')
+        start_time = request.form.get('start_time')
+        end_time = request.form.get('end_time')
+        if not all([session_name, subject_id, class_id, session_date, start_time]):
+            flash('Vui lòng nhập đầy đủ thông tin!', 'error')
+        else:
+            conn.execute('''
+                UPDATE attendance_sessions
+                SET session_name=?, subject_id=?, class_id=?, session_date=?, start_time=?, end_time=?
+                WHERE id=?
+            ''', (session_name, subject_id, class_id, session_date, start_time, end_time, session_id))
+            conn.commit()
+            flash('Cập nhật ca điểm danh thành công!', 'success')
+            conn.close()
+            return redirect(url_for('attendance.list_sessions'))
+    # Lấy danh sách môn học và lớp
+    subjects = conn.execute('SELECT id, subject_code, subject_name FROM subjects ORDER BY subject_name').fetchall()
+    classes = conn.execute('SELECT id, class_code, class_name FROM classes ORDER BY class_name').fetchall()
+    conn.close()
+    return render_template('attendance/edit_session.html', session=session, subjects=subjects, classes=classes)
 
 # ================================
 # 2. ĐIỂM DANH BẰNG NHẬN DIỆN AI
@@ -371,7 +420,7 @@ def recognize_face():
             # Trả về tất cả kết quả, bao gồm cả những khuôn mặt không đạt ngưỡng
             all_faces = recognition_result.get('faces', [])
             
-            # Thêm thông tin về những khuôn mặt được phát hiện nhưng không đạt ngưỡng
+            # Thêm thông tin về những khuôn mặt được phát hiện nhưng không đủ điều kiện
             # (model có thể detect nhưng confidence/quality thấp)
             detected_faces = []
             
@@ -624,13 +673,12 @@ def auto_session_manager():
     """Quản lý các ca điểm danh tự động"""
     # Lấy danh sách session đang hoạt động
     active_sessions = get_active_sessions()
-    
-    # Lấy thông tin từ database
     conn = get_db_connection()
     session_data = {}
-    
+    active_session_ids = set()
     for port, status in active_sessions.items():
         session_id = status['session_id']
+        active_session_ids.add(session_id)
         session_info = conn.execute('''
             SELECT ast.*, s.subject_name, s.subject_code, c.class_name, c.class_code
             FROM attendance_sessions ast
@@ -638,17 +686,24 @@ def auto_session_manager():
             JOIN classes c ON ast.class_id = c.id
             WHERE ast.id = ?
         ''', (session_id,)).fetchone()
-        
         if session_info:
             session_data[port] = {
                 'session_info': dict(session_info),
                 'status': status,
                 'url': f'http://localhost:{port}'
             }
-    
+
+    # Lấy tất cả ca điểm danh (bao gồm cả ca tự động và thủ công)
+    all_sessions = conn.execute('''
+        SELECT ast.*, s.subject_name, s.subject_code, c.class_name, c.class_code,
+               (SELECT COUNT(*) FROM attendance_records ar WHERE ar.session_id = ast.id) as attendance_count
+        FROM attendance_sessions ast
+        JOIN subjects s ON ast.subject_id = s.id
+        JOIN classes c ON ast.class_id = c.id
+        ORDER BY ast.session_date DESC, ast.start_time DESC
+    ''').fetchall()
     conn.close()
-    
-    return render_template('attendance/auto_session_manager.html', sessions=session_data)
+    return render_template('attendance/auto_session_manager.html', sessions=session_data, inactive_sessions=all_sessions)
 
 @attendance_bp.route('/auto_sessions/stop/<int:port>', methods=['POST'])
 def stop_auto_session(port):

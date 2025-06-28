@@ -6,6 +6,17 @@
   </div>
 </div>
 
+{% if class_info %}
+<div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+  <i class="fas fa-school me-2"></i>
+  <div>
+    Danh sách sinh viên lớp <strong>{{ class_info.class_name }}</strong> ({{ class_info.class_code }})
+    <a href="{{ url_for('classes.list_classes') }}" class="btn btn-sm btn-outline-secondary ms-3">Quay lại danh sách lớp</a>
+    <button type="button" class="btn btn-sm btn-success ms-2" onclick="showExportModal({{ class_info.id }})"><i class="fas fa-file-excel me-1"></i>Xuất Excel</button>
+  </div>
+</div>
+{% endif %}
+
 <div class="row">
   <div class="col-12">
     <div class="card shadow">
@@ -108,6 +119,49 @@
     </div>
   </div>
 </div>
+
+<!-- Export Excel Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-file-excel text-success me-2"></i>
+          Xuất báo cáo Excel
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="exportForm">
+          <input type="hidden" id="export_class_id" name="class_id" />
+
+          <div class="mb-3">
+            <label for="subject_select" class="form-label"> <i class="fas fa-book me-1"></i>Chọn môn học </label>
+            <select class="form-select" id="subject_select" name="subject_id">
+              <option value="">Tất cả môn học</option>
+            </select>
+            <div class="form-text">Chọn môn học cụ thể để xuất báo cáo điểm danh theo môn, hoặc để trống để xuất tất cả</div>
+          </div>
+
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Nội dung file Excel:</strong>
+            <ul class="mb-0 mt-2">
+              <li>MSSV và Họ tên sinh viên</li>
+              <li>Cột điểm danh theo từng ngày có ca học</li>
+              <li>Thống kê tổng số buổi có mặt/vắng</li>
+              <li>Tỷ lệ có mặt (%)</li>
+            </ul>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <button type="button" class="btn btn-success" onclick="exportExcel()"><i class="fas fa-download me-1"></i>Xuất Excel</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %} {% block scripts %}
 <script>
   function deleteStudent(studentId, studentName) {
@@ -116,6 +170,101 @@
 
     const modal = new bootstrap.Modal(document.getElementById("deleteModal"));
     modal.show();
+  }
+
+  async function showExportModal(classId) {
+    // Set class ID
+    document.getElementById("export_class_id").value = classId;
+
+    // Load subjects for this class
+    try {
+      const response = await fetch(`/api/subjects_by_class/${classId}`);
+      const subjects = await response.json();
+
+      const subjectSelect = document.getElementById("subject_select");
+      // Clear existing options except "Tất cả môn học"
+      subjectSelect.innerHTML = '<option value="">Tất cả môn học</option>';
+
+      // Add subjects
+      subjects.forEach((subject) => {
+        const option = document.createElement("option");
+        option.value = subject.id;
+        option.textContent = `${subject.subject_code} - ${subject.subject_name}`;
+        subjectSelect.appendChild(option);
+      });
+    } catch (error) {
+      console.error("Error loading subjects:", error);
+      showAlert("Lỗi khi tải danh sách môn học", "error");
+    }
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById("exportModal"));
+    modal.show();
+  }
+
+  function exportExcel() {
+    const classId = document.getElementById("export_class_id").value;
+    const subjectId = document.getElementById("subject_select").value;
+
+    let url = `/students/export_attendance_excel?class_id=${classId}`;
+    if (subjectId) {
+      url += `&subject_id=${subjectId}`;
+    }
+
+    // Show loading
+    const exportBtn = document.querySelector("#exportModal .btn-success");
+    const originalText = exportBtn.innerHTML;
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang xuất...';
+    exportBtn.disabled = true;
+
+    // Download file
+    window.location.href = url;
+
+    // Reset button after delay
+    setTimeout(() => {
+      exportBtn.innerHTML = originalText;
+      exportBtn.disabled = false;
+
+      // Close modal
+      const modal = bootstrap.Modal.getInstance(document.getElementById("exportModal"));
+      modal.hide();
+
+      showAlert("Đã xuất file Excel thành công!", "success");
+    }, 2000);
+  }
+
+  function showAlert(message, type = "info") {
+    const alertClass = type === "error" ? "danger" : type;
+    const alertHtml = `
+      <div class="alert alert-${alertClass} alert-dismissible fade show" role="alert">
+        <i class="fas fa-${getAlertIcon(type)} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    `;
+
+    const container = document.querySelector(".container-fluid");
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = alertHtml;
+    container.insertBefore(tempDiv.firstElementChild, container.firstElementChild);
+
+    // Auto dismiss after 5 seconds
+    setTimeout(() => {
+      const alert = container.querySelector(".alert");
+      if (alert) {
+        alert.remove();
+      }
+    }, 5000);
+  }
+
+  function getAlertIcon(type) {
+    const icons = {
+      success: "check-circle",
+      error: "exclamation-triangle",
+      warning: "exclamation-circle",
+      info: "info-circle",
+    };
+    return icons[type] || "info-circle";
   }
 </script>
 {% endblock %}

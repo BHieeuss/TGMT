@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Sửa ca điểm danh{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h3 class="mb-3">Sửa ca điểm danh</h3>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">Tên ca</label>
+      <input type="text" class="form-control" name="session_name" value="{{ session.session_name }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Môn học</label>
+      <select class="form-select" name="subject_id" required>
+        {% for subj in subjects %}
+        <option value="{{ subj.id }}" {% if session.subject_id == subj.id %}selected{% endif %}>{{ subj.subject_name }} ({{ subj.subject_code }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Lớp</label>
+      <select class="form-select" name="class_id" required>
+        {% for c in classes %}
+        <option value="{{ c.id }}" {% if session.class_id == c.id %}selected{% endif %}>{{ c.class_name }} ({{ c.class_code }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Ngày</label>
+      <input type="date" class="form-control" name="session_date" value="{{ session.session_date }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Giờ bắt đầu</label>
+      <input type="time" class="form-control" name="start_time" value="{{ session.start_time }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Giờ kết thúc</label>
+      <input type="time" class="form-control" name="end_time" value="{{ session.end_time or '' }}">
+    </div>
+    <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Lưu thay đổi</button>
+    <a href="{{ url_for('attendance.list_sessions') }}" class="btn btn-secondary">Quay lại</a>
+  </form>
+</div>
+{% endblock %}
