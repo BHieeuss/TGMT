@@ -365,97 +365,7 @@ Hệ thống điểm danh sinh viên sử dụng công nghệ nhận diện khu�
 - Ảnh gốc từ camera capture
 - Ảnh đã được crop (chỉ khuôn mặt)
 - Augmented images cho training (rotation, brightness, contrast)
-
-### � exports/ - Export Files
-
-**Chứa**: File Excel và báo cáo được export
-**Format**: `{class_code}-{subject_name}-{date}.xlsx`
-**Nội dung**: Danh sách điểm danh theo môn học với timestamps
-│ ├── 📄 **init**.py # Package initializer
-│ ├── 📄 auth.py # 🔐 Authentication routes (login/logout)
-│ ├── 📄 classes.py # 🏫 Quản lý lớp học CRUD operations
-│ ├── 📄 students.py # 👨‍🎓 Quản lý sinh viên + Excel export
-│ ├── 📄 subjects.py # 📚 Quản lý môn học
-│ ├── 📄 attendance.py # 📅 Quản lý ca điểm danh + AI recognition
-│ ├── 📄 reports.py # 📊 Báo cáo và thống kê
-│ └── 📄 ai.py # 🤖 AI model management + training
-│
-├── 📁 models/ # 🧠 AI MODELS & DATABASE
-│ ├── 📄 database.py # 🗄️ SQLite connection + schema + queries
-│ ├── 📄 advanced*face_model.py # 🎯 AI model chính - Ensemble learning
-│ ├── 📄 advanced_face_model.pkl # 💾 Trained AI model (binary file)
-│ ├── 📄 face_recognition_model.py # 👤 Face recognition library wrapper
-│ ├── 📄 opencv_face_model.py # 📷 OpenCV face detection
-│ └── 📄 opencv_face_model.pkl # 💾 OpenCV trained model
-│
-├── 📁 templates/ # 🎨 JINJA2 HTML TEMPLATES
-│ ├── 📄 base.html # 🏗️ Base template - Navigation + Layout
-│ ├── 📄 dashboard.html # 🏠 Trang chủ - Statistics dashboard
-│ ├── 📄 login.html # 🔑 Trang đăng nhập
-│ │
-│ ├── 📁 students/ # 👨‍🎓 STUDENT MANAGEMENT TEMPLATES
-│ │ ├── 📄 list.html # 📋 Danh sách sinh viên + Export modal
-│ │ ├── 📄 add.html # ➕ Form thêm sinh viên mới
-│ │ ├── 📄 collect_face_data.html # 📸 Thu thập dữ liệu khuôn mặt
-│ │ └── 📄 select_student_for_collection.html # 🎯 Chọn sinh viên thu thập
-│ │
-│ ├── 📁 classes/ # 🏫 CLASS MANAGEMENT
-│ │ ├── 📄 list.html # 📋 Danh sách lớp học
-│ │ ├── 📄 add.html # ➕ Thêm lớp học
-│ │ └── 📄 edit.html # ✏️ Sửa thông tin lớp
-│ │
-│ ├── 📁 subjects/ # 📚 SUBJECT MANAGEMENT
-│ │ ├── 📄 list.html # 📋 Danh sách môn học
-│ │ ├── 📄 add.html # ➕ Thêm môn học
-│ │ └── 📄 edit.html # ✏️ Sửa môn học
-│ │
-│ ├── 📁 attendance/ # 📅 ATTENDANCE MANAGEMENT
-│ │ ├── 📄 sessions.html # 📋 Danh sách ca điểm danh
-│ │ ├── 📄 edit_session.html # ✏️ Sửa ca điểm danh
-│ │ ├── 📄 face_recognition_select.html # 🎯 Chọn phương thức điểm danh
-│ │ ├── 📄 create_auto_session.html # 🤖 Tạo ca tự động
-│ │ └── 📄 auto_session_manager.html # ⚙️ Quản lý ca tự động
-│ │
-│ ├── 📁 ai/ # 🤖 AI MANAGEMENT
-│ │ ├── 📄 dashboard.html # 🎛️ AI model dashboard
-│ │ ├── 📄 test_recognition.html # 🧪 Test nhận diện
-│ │ ├── 📄 debug_model.html # 🔧 Debug AI model
-│ │ └── 📄 settings.html # ⚙️ Cài đặt AI
-│ │
-│ ├── 📁 reports/ # 📊 REPORTS & ANALYTICS
-│ │ └── 📄 attendance.html # 📈 Báo cáo điểm danh
-│ │
-│ └── 📁 auto_attendance/ # 🤖 AUTO ATTENDANCE
-│ └── 📄 session.html # 🎯 Session tự động
-│
-├── 📁 static/ # 🎨 STATIC FILES - CSS, JS, Images
-│ ├── 📁 css/
-│ │ └── 📄 style.css # 🎨 Custom CSS - Modern UI với Glass morphism
-│ ├── 📁 js/
-│ │ └── 📄 app.js # ⚡ JavaScript chính - AJAX, Camera, UI interactions
-│ └── 📁 img/ # 🖼️ Static images (logos, icons)
-│
-├── 📁 ai/ # 🧠 AI CORE MODULES
-│ ├── 📄 **init**.py # Package initializer
-│ └── 📄 face_recognition_ai.py # 🎯 Core AI recognition algorithms
-│
-├── 📁 uploads/ # 📁 FILE UPLOADS
-│ └── 📁 faces/ # 👤 Thư mục ảnh khuôn mặt sinh viên
-│ └── 📁 [STUDENT_ID]/ # 📁 Thư mục riêng cho từng sinh viên
-│ ├── 📄 [MSSV]\_001*[timestamp].jpg # 📸 Ảnh gốc
-│ ├── 📄 [MSSV]_001_[timestamp]_aug_1.jpg # 🔄 Ảnh augmented
-│ └── 📄 [MSSV]\_001_[timestamp]\_aug_2.jpg # 🔄 Ảnh augmented
-│
-├── 📁 exports/ # 📊 EXCEL EXPORTS
-│ └── 📄 [ClassCode] - [Subject] - [Date].xlsx # 📈 File Excel báo cáo
-│
-├── 📁 report-progess/ # 📋 PROJECT DOCUMENTS
-│ └── 📄 (Lan1)25-6-2025.docx # 📄 Báo cáo tiến độ
-│
-├── 📁 **pycache**/ # 🗂️ Python compiled files
-└── 📁 .git/ # 🔄 Git version control
-
-````
+  `
 
 ## 🎯 Chức năng chi tiết từng file
 
@@ -472,7 +382,7 @@ Hệ thống điểm danh sinh viên sử dụng công nghệ nhận diện khu�
 ✅ File serving cho uploaded images
 ✅ Auto-redirect đến login page khi chưa authenticated
 ✅ CORS và security configurations
-````
+```
 
 #### 📄 `auto_attendance_server.py` - Background Service
 
