@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, session
 import os
 import sqlite3
 from datetime import datetime
@@ -9,6 +9,7 @@ import base64
 import io
 import pandas as pd
 from werkzeug.utils import secure_filename
+from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
@@ -19,6 +20,16 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 # Ensure upload and export directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['EXPORT_FOLDER'], exist_ok=True)
+
+# Decorator để kiểm tra đăng nhập
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            flash('Vui lòng đăng nhập để truy cập!', 'warning')
+            return redirect(url_for('auth.login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Import routes
 from routes.auth import auth_bp
@@ -40,22 +51,32 @@ app.register_blueprint(ai_bp)
 
 @app.route('/')
 def index():
-    """Dashboard trang chủ"""
+    """Trang chủ - kiểm tra đăng nhập"""
+    from flask import session
+    
+    # Kiểm tra xem user đã đăng nhập chưa
+    if not session.get('logged_in'):
+        return redirect(url_for('auth.login'))
+    
+    # Nếu đã đăng nhập, hiển thị dashboard
     from models.database import get_dashboard_stats
     stats = get_dashboard_stats()
     return render_template('dashboard.html', stats=stats)
 
 @app.route('/camera')
+@login_required
 def camera():
     """Trang điểm danh bằng camera"""
     return render_template('camera.html')
 
 @app.route('/capture_faces')
+@login_required
 def capture_faces():
     """Trang thu thập dữ liệu khuôn mặt sinh viên"""
     return render_template('capture_faces.html')
 
 @app.route('/uploads/<filename>')
+@login_required
 def uploaded_file(filename):
     """Serve uploaded files"""
     return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -65,6 +86,7 @@ face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fronta
 from models.advanced_face_model import face_model
 
 @app.route('/api/detect_face', methods=['POST'])
+@login_required
 def detect_face():
     """API phát hiện và nhận diện khuôn mặt"""
     try:
@@ -112,6 +134,7 @@ def detect_face():
         return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
 
 @app.route('/api/capture_face', methods=['POST'])
+@login_required
 def capture_face():
     """API thu thập dữ liệu khuôn mặt sinh viên"""
     try:
@@ -204,11 +227,13 @@ def capture_face():
         return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
 
 @app.route('/test-camera')
+@login_required
 def test_camera():
     """Trang test camera đơn giản"""
     return render_template('test_camera.html')
 
 @app.route('/api/student_images/<student_id>')
+@login_required
 def get_student_images(student_id):
     """API lấy danh sách ảnh của sinh viên từ thư mục"""
     try:
@@ -246,6 +271,7 @@ def get_student_images(student_id):
         return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
 
 @app.route('/uploads/faces/<student_id>/<filename>')
+@login_required
 def serve_face_image(student_id, filename):
     """Serve face images từ thư mục của sinh viên"""
     try:
@@ -259,6 +285,7 @@ def serve_face_image(student_id, filename):
 
 # API routes cho subjects by class
 @app.route('/api/subjects_by_class/<int:class_id>')
+@login_required
 def api_subjects_by_class(class_id):
     """API lấy danh sách môn học có ca điểm danh cho lớp này"""
     from models.database import get_db_connection
