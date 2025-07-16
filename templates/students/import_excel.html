@@ -1,0 +1,125 @@
+{% extends "base.html" %} {% block title %}Import Sinh viên từ Excel{% endblock %} {% block content %}
+<div class="container mt-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="fas fa-file-excel me-2"></i>
+            Import Sinh viên từ Excel
+          </h4>
+        </div>
+        <div class="card-body">
+          <!-- Hướng dẫn -->
+          <div class="alert alert-info">
+            <h6><i class="fas fa-info-circle me-2"></i>Format file Excel yêu cầu:</h6>
+            <ul class="mb-2">
+              <li><strong>Cột B:</strong> MSSV (Mã số sinh viên)</li>
+              <li><strong>Cột C:</strong> Họ lót</li>
+              <li><strong>Cột D:</strong> Tên</li>
+            </ul>
+            <div class="small text-muted">
+              <strong>Ví dụ:</strong><br />
+              B2: 110121001, C2: Nguyễn Văn, D2: An<br />
+              B3: 110121002, C3: Trần Thị, D3: Bình<br />
+              <em>Lưu ý: Có thể có header ở dòng 1, hệ thống sẽ tự động bỏ qua</em>
+            </div>
+          </div>
+
+          <!-- Download Template -->
+          <div class="mb-4 text-center">
+            <a href="{{ url_for('students.download_template') }}" class="btn btn-outline-success">
+              <i class="fas fa-download me-2"></i>
+              Tải Template Excel Mẫu
+            </a>
+          </div>
+
+          <!-- Form Upload -->
+          <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+              <label for="class_id" class="form-label"> <i class="fas fa-users me-2"></i>Chọn lớp học </label>
+              <select class="form-select" id="class_id" name="class_id" required>
+                <option value="">-- Chọn lớp học --</option>
+                {% for class in classes %}
+                <option value="{{ class.id }}">{{ class.class_code }} - {{ class.class_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label for="excel_file" class="form-label"> <i class="fas fa-file-upload me-2"></i>Chọn file Excel </label>
+              <input type="file" class="form-control" id="excel_file" name="excel_file" accept=".xlsx,.xls" required />
+              <div class="form-text">Chấp nhận file .xlsx và .xls, tối đa 10MB</div>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+              <a href="{{ url_for('students.list_students') }}" class="btn btn-secondary"> <i class="fas fa-arrow-left me-2"></i>Quay lại </a>
+              <button type="submit" class="btn btn-primary"><i class="fas fa-upload me-2"></i>Import Sinh viên</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Preview Section -->
+      <div class="card mt-4 d-none" id="preview-section">
+        <div class="card-header">
+          <h6 class="mb-0">Preview File Excel</h6>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped" id="preview-table">
+              <thead class="table-dark">
+                <tr>
+                  <th>MSSV</th>
+                  <th>Họ và tên</th>
+                  <th>Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody id="preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById("excel_file").addEventListener("change", function (e) {
+    const file = e.target.files[0];
+    if (file) {
+      // Show file info
+      const fileInfo = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+      console.log("Selected file:", fileInfo);
+
+      // You can add Excel preview functionality here using libraries like SheetJS
+      // For now, we'll just show the file is selected
+    }
+  });
+
+  // Form validation
+  document.querySelector("form").addEventListener("submit", function (e) {
+    const classId = document.getElementById("class_id").value;
+    const file = document.getElementById("excel_file").files[0];
+
+    if (!classId) {
+      alert("Vui lòng chọn lớp học!");
+      e.preventDefault();
+      return;
+    }
+
+    if (!file) {
+      alert("Vui lòng chọn file Excel!");
+      e.preventDefault();
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      // 10MB
+      alert("File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.");
+      e.preventDefault();
+      return;
+    }
+  });
+</script>
+{% endblock %}

@@ -434,6 +434,15 @@
           imageCount = data.total_images;
           updateProgress();
 
+          // Kiểm tra xem đã hoàn thành chưa
+          if (data.is_complete || data.action === "complete") {
+            stopCollection();
+            addStatusMessage("🎉 HOÀN THÀNH! Đã thu thập đủ 40 ảnh chất lượng cao!", "success");
+            addStatusMessage("📊 Tất cả ảnh đã được xử lý và tối ưu hóa cho training model.", "info");
+            document.getElementById("trainBtn").disabled = false;
+            return;
+          }
+
           // Hiển thị thông tin chất lượng nếu có
           let qualityInfo = "";
           if (data.quality_info) {
@@ -463,29 +472,34 @@
             qualityInfo = ` (${qualityIcon} ${qualityLevel} - Độ nét: ${blur.toFixed(0)}, Sáng: ${brightness.toFixed(0)})`;
           }
 
+          // Hiển thị tiến độ với progress percent
+          let progressInfo = "";
+          if (data.progress_percent) {
+            progressInfo = ` - ${data.progress_percent}%`;
+          }
+
           if (isAutoMode) {
-            addStatusMessage(`📸 Ảnh ${imageCount}/40${qualityInfo}`, "success");
+            addStatusMessage(`📸 ${data.message}${progressInfo}${qualityInfo}`, "success");
           } else {
             addStatusMessage(`✅ ${data.message}${qualityInfo}`, "success");
           }
 
+          // Enable train button when có ít nhất 30 ảnh
           if (imageCount >= 30) {
             document.getElementById("trainBtn").disabled = false;
-            if (!isAutoMode) {
-              addStatusMessage("🎉 Đã thu thập đủ ảnh! Có thể train model.", "info");
-            }
-          }
-
-          if (imageCount >= 40) {
-            stopCollection();
-            addStatusMessage("🎉 Hoàn thành thu thập 40 ảnh! Sẵn sàng train model.", "success");
-            // Hiển thị thống kê tổng quan
-            addStatusMessage("📊 Tất cả ảnh đã được xử lý và tối ưu hóa cho training model.", "info");
           }
 
           // Cập nhật thông tin chất lượng ảnh
           updateQualityInfo(data.quality_info);
         } else {
+          // Xử lý trường hợp đã đủ ảnh
+          if (data.action === "complete") {
+            stopCollection();
+            addStatusMessage(`🛑 ${data.message}`, "warning");
+            document.getElementById("trainBtn").disabled = false;
+            return;
+          }
+
           addStatusMessage(`❌ ${data.message}`, "danger");
           if (isAutoMode) {
             // If error during collection, slow down

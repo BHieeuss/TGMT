@@ -1,16 +1,17 @@
 """
 Auto Attendance Server - Hệ thống điểm danh tự động
 Chạy trên port riêng biệt cho từng ca điểm danh
+Sử dụng hàm nhận diện thống nhất
 """
 
 import threading
 import time
 import cv2
 import numpy as np
-# import face_recognition  # Tạm thời comment out
+import base64
 from flask import Flask, render_template, Response, jsonify, request
 from models.database import get_db_connection
-from models.advanced_face_model import AdvancedFaceModel
+from utils.face_recognition_utils import recognize_face_from_image, mark_attendance
 from datetime import datetime
 import json
 import os
@@ -32,53 +33,41 @@ class AutoAttendanceServer:
         
         self.server = None
         self.camera = None
-        self.face_model = None
         self.is_running = False
         self.students_data = {}
         self.attendance_count = 0
+        self.marked_students = set()  # Theo dõi sinh viên đã điểm danh
+        
+        # Recognition log storage
+        self.recognition_log = []
+        self.max_log_size = 50  # Giới hạn số lượng log
+        self.log_lock = threading.Lock()
         
         # Setup logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(f'AutoAttendance-{port}')
         
-        # Initialize face recognition model
-        self.init_face_model()
+        # Initialize session data
+        self.init_session_data()
         
-        # Load session data
-        self.load_session_data()
+        # Cache model ready status để tránh lag
+        self._model_ready_cache = None
+        self._model_check_time = 0
+        self._model_cache_timeout = 10  # Cache 10 giây
         
         # Setup Flask routes
         self.setup_routes()
     
-    def init_face_model(self):
-        """Khởi tạo model nhận diện khuôn mặt"""
+    def init_session_data(self):
+        """Khởi tạo dữ liệu ca điểm danh"""
         try:
-            from models.advanced_face_model import AdvancedFaceModel
-            self.face_model = AdvancedFaceModel()
-            
-            # Kiểm tra xem model đã được train chưa
-            if hasattr(self.face_model, 'is_trained') and self.face_model.is_trained:
-                self.logger.info("Face recognition model initialized and trained successfully")
-            else:
-                self.logger.warning("Face recognition model initialized but not trained yet")
-                # Thử load model nếu có file
-                try:
-                    import os
-                    model_path = os.path.join('models', 'advanced_face_model.pkl')
-                    if os.path.exists(model_path):
-                        self.logger.info(f"Found model file at {model_path}, attempting to load...")
-                        self.face_model.load_model(model_path)
-                        if hasattr(self.face_model, 'is_trained'):
-                            self.logger.info(f"Model loaded, is_trained: {self.face_model.is_trained}")
-                except Exception as load_error:
-                    self.logger.error(f"Error loading model: {load_error}")
-                
-        except ImportError as e:
-            self.logger.error(f"Cannot import AdvancedFaceModel: {e}")
-            self.face_model = None
+            # Load session data
+            self.load_session_data()
+            self.logger.info(f"Session {self.session_id} initialized successfully")
         except Exception as e:
-            self.logger.error(f"Error initializing face model: {e}")
-            self.face_model = None
+            self.logger.error(f"Error initializing session data: {e}")
+            self.session_info = None
+            self.students_data = {}
     
     def load_session_data(self):
         """Tải thông tin ca điểm danh và sinh viên"""
@@ -104,7 +93,7 @@ class AutoAttendanceServer:
             WHERE class_id = ?
         ''', (self.session_info['class_id'],)).fetchall()
         
-        # Load face encodings cho sinh viên
+        # Load student data
         for student in students:
             self.students_data[student['student_id']] = {
                 'id': student['id'],
@@ -218,6 +207,15 @@ class AutoAttendanceServer:
                 'total_students': len(self.students_data)
             })
         
+        @self.app.route('/api/recognition_log')
+        def api_recognition_log():
+            """API lấy log nhận diện"""
+            with self.log_lock:
+                return jsonify({
+                    'success': True,
+                    'logs': self.recognition_log.copy()
+                })
+        
         @self.app.route('/api/status')
         def api_status():
             """API trạng thái server"""
@@ -228,7 +226,7 @@ class AutoAttendanceServer:
                 'attendance_count': self.attendance_count,
                 'total_students': len(self.students_data),
                 'camera_active': self.camera is not None,
-                'model_ready': self.face_model is not None and getattr(self.face_model, 'is_trained', False)
+                'model_ready': self._check_model_ready()
             })
         
         @self.app.route('/api/recognition_status')
@@ -238,8 +236,47 @@ class AutoAttendanceServer:
                 'success': True,
                 'recognizing': self.camera is not None and self.is_running,
                 'detected_faces': getattr(self, 'last_detected_faces', 0),
-                'model_ready': self.face_model is not None and getattr(self.face_model, 'is_trained', False)
+                'model_ready': self._check_model_ready()
             })
+        
+        @self.app.route('/api/debug')
+        def debug_info():
+            """API debug thông tin hệ thống"""
+            return jsonify({
+                'success': True,
+                'debug_info': {
+                    'session_id': self.session_id,
+                    'port': self.port,
+                    'is_running': self.is_running,
+                    'model_ready': self._check_model_ready(),
+                    'camera_available': self.camera is not None and self.camera.isOpened() if self.camera else False,
+                    'total_students': len(self.students_data),
+                    'attendance_count': self.attendance_count,
+                    'marked_students': len(self.marked_students),
+                    'recognition_log_count': len(self.recognition_log),
+                    'last_detected_faces': getattr(self, 'last_detected_faces', 0)
+                },
+                'message': 'Debug info retrieved'
+            })
+    
+    def add_recognition_log(self, log_type, student_id=None, student_name=None, confidence=None, reason=None):
+        """Thêm log nhận diện"""
+        with self.log_lock:
+            log_entry = {
+                'type': log_type,
+                'timestamp': datetime.now().isoformat(),
+                'student_id': student_id,
+                'student_name': student_name,
+                'confidence': confidence,
+                'reason': reason
+            }
+            
+            # Thêm vào đầu list
+            self.recognition_log.insert(0, log_entry)
+            
+            # Giới hạn số lượng log
+            if len(self.recognition_log) > self.max_log_size:
+                self.recognition_log = self.recognition_log[:self.max_log_size]
     
     def update_attendance_data(self):
         """Cập nhật dữ liệu điểm danh từ database"""
@@ -273,7 +310,7 @@ class AutoAttendanceServer:
         self.logger.info(f"Updated attendance data: {self.attendance_count}/{len(self.students_data)} students attended")
     
     def generate_frames(self):
-        """Generator tạo frame video với nhận diện khuôn mặt"""
+        """Generator tạo frame video với nhận diện khuôn mặt - 2 giây quét 1 lần"""
         # Khởi tạo camera
         if not self.camera:
             self.camera = cv2.VideoCapture(0)
@@ -283,6 +320,10 @@ class AutoAttendanceServer:
         
         # Load face cascade cho detection
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        # Thiết lập thời gian quét - GIẢM ĐỘ TRỄ
+        last_recognition_time = 0
+        recognition_interval = 1.5  # Giảm từ 2s xuống 1.5s để phản hồi nhanh hơn
         
         while self.is_running:
             success, frame = self.camera.read()
@@ -300,6 +341,15 @@ class AutoAttendanceServer:
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             cv2.putText(frame, f"Attendance: {self.attendance_count}/{len(self.students_data)}", (10, 90), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(frame, f"Confidence Range: 85-100", (10, 120), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            # Hiển thị thời gian đến lần quét tiếp theo
+            current_time = time.time()
+            time_since_last = current_time - last_recognition_time
+            time_to_next = max(0, recognition_interval - time_since_last)
+            cv2.putText(frame, f"Next scan: {time_to_next:.1f}s", (10, 150), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
             
             self.last_detected_faces = 0
             
@@ -313,88 +363,159 @@ class AutoAttendanceServer:
                 if len(faces) > 0:
                     self.last_detected_faces = len(faces)
                     
+                    # Chỉ thực hiện nhận diện AI nếu đã đủ 2 giây
+                    should_recognize = (current_time - last_recognition_time) >= recognition_interval
+                    
                     for (x, y, w, h) in faces:
-                        # Draw rectangle around face
+                        # Luôn vẽ box phát hiện face
                         color = (0, 255, 255)  # Yellow for detected face
                         label = f"Face Detected"
                         
-                        # Try to recognize using AI model if available
-                        if self.face_model and hasattr(self.face_model, 'is_trained') and self.face_model.is_trained:
+                        # Thực hiện nhận diện AI nếu đã đủ thời gian
+                        if should_recognize and self._check_model_ready():
                             try:
-                                # Extract face region
-                                face_img = frame[y:y+h, x:x+w]
+                                # TỐI ƯU HÓA: Chỉ xử lý vùng face thay vì toàn bộ frame
+                                # Crop vùng face với padding nhẹ
+                                padding = 20
+                                face_x_start = max(0, x - padding)
+                                face_y_start = max(0, y - padding)
+                                face_x_end = min(frame.shape[1], x + w + padding)
+                                face_y_end = min(frame.shape[0], y + h + padding)
                                 
-                                # Convert face to base64 for AI model
-                                ret, buffer = cv2.imencode('.jpg', face_img)
+                                face_region = frame[face_y_start:face_y_end, face_x_start:face_x_end]
+                                
+                                # Convert vùng face to base64 (nhanh hơn nhiều)
+                                ret, buffer = cv2.imencode('.jpg', face_region, [cv2.IMWRITE_JPEG_QUALITY, 85])
                                 if not ret:
                                     continue
                                 
                                 import base64
                                 face_b64 = base64.b64encode(buffer).decode('utf-8')
-                                face_data = f"data:image/jpeg;base64,{face_b64}"
                                 
-                                # Use AI model to recognize
-                                result = self.face_model.recognize_face(face_data, use_ensemble=True)
+                                # Gọi hàm nhận diện với confidence threshold phù hợp thực tế
+                                result = recognize_face_from_image(face_b64, confidence_threshold=110)  # Cao hơn 100 một chút để lọc kết quả tốt
                                 
                                 if result and result.get('success', False) and result.get('faces'):
-                                    # Get best face result
-                                    best_face = None
-                                    for face in result['faces']:
-                                        if face.get('student_id'):  # Valid recognized face
-                                            best_face = face
-                                            break
-                                    
-                                    if best_face:
-                                        student_id = best_face['student_id']
-                                        confidence = best_face.get('combined_score', 0)
-                                        name = self.students_data.get(student_id, {}).get('name', 'Unknown')
-                                        
-                                        # Check if already attended
-                                        already_attended = self.students_data.get(student_id, {}).get('attended', False)
-                                        
-                                        if already_attended:
-                                            color = (0, 255, 0)  # Green
-                                            label = f"{name} - DA DIEM DANH"
-                                        else:
-                                            color = (0, 255, 255)  # Yellow
-                                            label = f"{name} ({confidence:.2f})"
+                                    # Xử lý kết quả nhận diện
+                                    for face_data in result['faces']:
+                                        # Kiểm tra có nhận diện được không
+                                        if face_data.get('status') == 'recognized':
+                                            student_id = face_data['mssv']
+                                            confidence = face_data.get('confidence', 0)
                                             
-                                            # Try to save attendance
-                                            success = self.save_attendance(student_id)
-                                            if success:
-                                                self.logger.info(f"Attendance saved for {student_id} - {name}")
-                                    else:
-                                        color = (0, 0, 255)  # Red
-                                        label = f"Unknown (Low confidence)"
+                                            # Lấy vị trí face từ bbox - ĐIỀU CHỈNH OFFSET
+                                            bbox = face_data.get('bbox', {})
+                                            if bbox:
+                                                # Điều chỉnh tọa độ về frame gốc
+                                                face_x = face_x_start + bbox.get('x', 0)
+                                                face_y = face_y_start + bbox.get('y', 0)
+                                                face_w = bbox.get('w', w)
+                                                face_h = bbox.get('h', h)
+                                            else:
+                                                face_x, face_y, face_w, face_h = x, y, w, h
+                                            
+                                            # Kiểm tra đã điểm danh chưa
+                                            if student_id in self.marked_students:
+                                                color = (0, 255, 0)  # Green
+                                                label = f"{student_id} - DA DIEM DANH"
+                                                # Log duplicate
+                                                self.add_recognition_log('duplicate', student_id, student_id, confidence, 'Sinh viên đã điểm danh trước đó')
+                                            else:
+                                                # Kiểm tra confidence threshold - ĐIỀU CHỈNH CHO THỰC TẾ 85-95
+                                                if 85 <= confidence <= 100:  # Cho phép điểm danh với confidence 85-100
+                                                    color = (0, 255, 255)  # Yellow
+                                                    label = f"{student_id} ({confidence:.1f})"
+                                                    
+                                                    # Lưu điểm danh
+                                                    success = self.save_attendance(student_id, confidence)
+                                                    if success:
+                                                        self.marked_students.add(student_id)
+                                                        self.logger.info(f"Attendance saved for {student_id} (confidence: {confidence:.1f})")
+                                                        color = (0, 255, 0)  # Green
+                                                        label = f"{student_id} - DIEM DANH OK"
+                                                        # Log success
+                                                        self.add_recognition_log('success', student_id, student_id, confidence, 'Điểm danh thành công')
+                                                elif confidence < 85:
+                                                    color = (255, 0, 0)  # Blue
+                                                    label = f"{student_id} (Low: {confidence:.1f})"
+                                                    # Log failed
+                                                    self.add_recognition_log('failed', student_id, student_id, confidence, f'Độ tin cậy thấp (<85): {confidence:.1f}')
+                                                else:  # confidence > 100
+                                                    color = (255, 0, 0)  # Blue  
+                                                    label = f"{student_id} (High: {confidence:.1f})"
+                                                    # Log failed
+                                                    self.add_recognition_log('failed', student_id, student_id, confidence, f'Độ tin cậy quá cao (>100): {confidence:.1f}')
+                                            
+                                            # Vẽ box và label
+                                            cv2.rectangle(frame, (face_x, face_y), (face_x + face_w, face_y + face_h), color, 3)
+                                            cv2.putText(frame, label, (face_x, face_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                                            
+                                        else:
+                                            # Không nhận diện được (status != 'recognized')
+                                            bbox = face_data.get('bbox', {})
+                                            if bbox:
+                                                # Điều chỉnh tọa độ về frame gốc
+                                                face_x = face_x_start + bbox.get('x', 0)
+                                                face_y = face_y_start + bbox.get('y', 0)
+                                                face_w = bbox.get('w', w)
+                                                face_h = bbox.get('h', h)
+                                            else:
+                                                face_x, face_y, face_w, face_h = x, y, w, h
+                                            
+                                            color = (0, 0, 255)  # Red
+                                            label = "KHONG XAC DINH"
+                                            cv2.rectangle(frame, (face_x, face_y), (face_x + face_w, face_y + face_h), color, 3)
+                                            cv2.putText(frame, label, (face_x, face_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                                            # Log unknown face
+                                            self.add_recognition_log('failed', None, 'Unknown', face_data.get('confidence', 0), 'Không nhận diện được')
+                                
+                                elif result and result.get('success', False) and len(result.get('faces', [])) == 0:
+                                    # Không phát hiện khuôn mặt từ AI
+                                    pass  # Sử dụng detection từ cascade
+                                
                                 else:
-                                    color = (0, 0, 255)  # Red
-                                    label = f"Recognition Failed"
+                                    # Lỗi AI hoặc không có kết quả
+                                    color = (128, 128, 128)  # Gray
+                                    label = "Recognition Failed"
+                                    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                                    cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                                    
+                                # Cập nhật thời gian sau khi nhận diện
+                                last_recognition_time = current_time
                                     
                             except Exception as model_error:
                                 self.logger.error(f"AI model error: {model_error}")
                                 color = (255, 0, 0)  # Blue
                                 label = "Model Error"
+                                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                                cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                                last_recognition_time = current_time  # Cập nhật thời gian dù có lỗi
                         else:
-                            # No AI model, just detect faces
-                            color = (255, 255, 0)  # Cyan
-                            label = "Face - No AI Model"
-                        
-                        # Draw rectangle
-                        cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-                        
-                        # Draw label with background
-                        (text_width, text_height), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                        cv2.rectangle(frame, (x, y - text_height - 10), (x + text_width, y), color, -1)
-                        cv2.putText(frame, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+                            # Không có AI model hoặc chưa đủ thời gian
+                            if should_recognize:
+                                color = (255, 255, 0)  # Cyan
+                                label = "Face - No AI Model"
+                            else:
+                                color = (128, 128, 128)  # Gray
+                                label = f"Face - Wait {time_to_next:.1f}s"
+                            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                            cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                 
                 else:
                     # No faces detected
-                    cv2.putText(frame, "Khong phat hien khuon mat", (10, 120), 
+                    cv2.putText(frame, "Khong phat hien khuon mat", (10, 180), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+                    # Log detection status occasionally
+                    if hasattr(self, 'last_detection_log_time'):
+                        if time.time() - self.last_detection_log_time > 5:  # Every 5 seconds
+                            self.add_recognition_log('detection', None, None, None, 'Không phát hiện khuôn mặt')
+                            self.last_detection_log_time = time.time()
+                    else:
+                        self.last_detection_log_time = time.time()
             
             except Exception as e:
                 self.logger.error(f"Face detection error: {e}")
-                cv2.putText(frame, f"Loi nhan dien: {str(e)[:50]}", (10, 120), 
+                cv2.putText(frame, f"Loi nhan dien: {str(e)[:50]}", (10, 180), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             
             # Encode frame to JPEG
@@ -403,8 +524,11 @@ class AutoAttendanceServer:
                 frame_bytes = buffer.tobytes()
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            
+            # Thêm delay nhỏ để tránh tải CPU quá cao
+            time.sleep(0.1)  # 100ms delay giữa các frame
     
-    def save_attendance(self, student_id):
+    def save_attendance(self, student_id, confidence=0.85):
         """Lưu điểm danh cho sinh viên - chỉ cho phép 1 lần duy nhất"""
         try:
             # Kiểm tra local cache trước
@@ -433,11 +557,11 @@ class AutoAttendanceServer:
             ''', (student_id,)).fetchone()
             
             if student_record:
-                # Lưu bản ghi điểm danh
+                # Lưu bản ghi điểm danh với confidence score thực tế
                 conn.execute('''
                     INSERT INTO attendance_records (session_id, student_id, attendance_time, method, confidence, status)
                     VALUES (?, ?, datetime('now'), 'face_recognition_auto', ?, 'present')
-                ''', (self.session_id, student_record['id'], 85.0))
+                ''', (self.session_id, student_record['id'], confidence))  # Lưu confidence thực tế 85-100
                 
                 conn.commit()
                 
@@ -536,6 +660,33 @@ class AutoAttendanceServer:
         self.logger.info("Face recognition library not available, using AI model instead")
         # Không load faces nữa, sử dụng AI model
         pass
+    
+    def _check_model_ready(self):
+        """Kiểm tra model đã sẵn sàng hay chưa - CÓ CACHE ĐỂ TRÁNH LAG"""
+        current_time = time.time()
+        
+        # Sử dụng cache nếu còn hiệu lực
+        if (self._model_ready_cache is not None and 
+            current_time - self._model_check_time < self._model_cache_timeout):
+            return self._model_ready_cache
+        
+        # Kiểm tra lại model
+        try:
+            from utils.face_recognition_utils import load_trained_model
+            recognizer, detector, id_to_mssv, error = load_trained_model()
+            result = error is None and recognizer is not None
+            
+            # Cache kết quả
+            self._model_ready_cache = result
+            self._model_check_time = current_time
+            
+            return result
+        except Exception as e:
+            self.logger.error(f"Error checking model ready: {e}")
+            # Cache kết quả false
+            self._model_ready_cache = False
+            self._model_check_time = current_time
+            return False
 
 
 # Global dictionary to store running servers

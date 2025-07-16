@@ -8,6 +8,7 @@ from PIL import Image
 import base64
 import io
 import pandas as pd
+import pickle
 from werkzeug.utils import secure_filename
 from functools import wraps
 
@@ -81,14 +82,13 @@ def uploaded_file(filename):
     """Serve uploaded files"""
     return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-# Initialize OpenCV face detector and AI model
+# Initialize OpenCV face detector
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-from models.advanced_face_model import face_model
 
 @app.route('/api/detect_face', methods=['POST'])
 @login_required
 def detect_face():
-    """API phát hiện và nhận diện khuôn mặt"""
+    """API phát hiện khuôn mặt đơn giản"""
     try:
         data = request.get_json()
         image_data = data.get('image')
@@ -96,26 +96,20 @@ def detect_face():
         if not image_data:
             return jsonify({'success': False, 'message': 'Không có dữ liệu ảnh'})
         
-        # Try AI recognition first if model is available
-        if face_model.is_trained:
-            ai_result = face_model.recognize_face(image_data)
-            if ai_result['success']:
-                return jsonify({
-                    'success': True,
-                    'message': f'Phát hiện {ai_result["face_count"]} khuôn mặt',
-                    'face_count': ai_result['face_count'],
-                    'faces': ai_result['faces'],
-                    'method': 'ai_recognition'
-                })
+        # Decode base64 image
+        image_data = image_data.split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
         
-        # Fallback to basic face detection
-        basic_result = face_model.detect_face_only(image_data)
-        return jsonify({
-            'success': basic_result['success'],
-            'message': f'Phát hiện {basic_result["face_count"]} khuôn mặt',
-            'face_count': basic_result['face_count'],
-            'method': 'basic_detection'
-        })
+        # Convert to grayscale
+        image_array = np.array(image)
+        if len(image_array.shape) == 3:
+            gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+        else:
+            gray = image_array
+        
+        # Detect faces
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
         
         if len(faces) > 0:
             return jsonify({
@@ -136,7 +130,7 @@ def detect_face():
 @app.route('/api/capture_face', methods=['POST'])
 @login_required
 def capture_face():
-    """API thu thập dữ liệu khuôn mặt sinh viên"""
+    """API thu thập dữ liệu khuôn mặt sinh viên - quy trình đơn giản như script mẫu"""
     try:
         data = request.get_json()
         student_id = data.get('student_id')
@@ -150,12 +144,23 @@ def capture_face():
         image_bytes = base64.b64decode(image_data)
         image = Image.open(io.BytesIO(image_bytes))
         
-        # Convert PIL image to numpy array
+        # Convert PIL image to OpenCV format
         image_array = np.array(image)
-        gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+        if len(image_array.shape) == 3:  # Color image
+            image_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+        else:
+            image_bgr = cv2.cvtColor(image_array, cv2.COLOR_GRAY2BGR)
         
-        # Detect faces
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        # Convert to grayscale - giống script mẫu
+        gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+        
+        # Detect faces - giống script mẫu
+        faces = face_cascade.detectMultiScale(
+            gray, 
+            scaleFactor=1.1, 
+            minNeighbors=5, 
+            minSize=(50, 50)
+        )
         
         if len(faces) == 0:
             return jsonify({'success': False, 'message': 'Không phát hiện khuôn mặt trong ảnh'})
@@ -164,32 +169,40 @@ def capture_face():
         largest_face = max(faces, key=lambda face: face[2] * face[3])
         x, y, w, h = largest_face
         
-        # Crop face region
-        face_roi = image_array[y:y+h, x:x+w]
-        face_image = Image.fromarray(face_roi)
+        # Crop face region - giống script mẫu, không padding phức tạp
+        face_roi = gray[y:y+h, x:x+w]
+        
+        # Resize to 128x128 - giống script mẫu
+        face_resized = cv2.resize(face_roi, (128, 128))
+        
+        # Không xử lý phức tạp khác - lưu trực tiếp như script mẫu
+        face_final = face_resized
         
         # Create student directory if not exists
         student_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'faces', student_id)
         os.makedirs(student_dir, exist_ok=True)
         
-        # Count existing images to generate sequential filename
-        existing_files = [f for f in os.listdir(student_dir) if f.endswith('.jpg')]
+        # Count existing ORIGINAL images only (không tính augmented)
+        existing_files = [f for f in os.listdir(student_dir) 
+                         if f.endswith('.jpg') and '_aug_' not in f]
         image_count = len(existing_files) + 1
         
-        # Save face image with sequential numbering
+        # Save processed face image (grayscale) with sequential numbering
         face_filename = f"{student_id}_{image_count:03d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         face_path = os.path.join(student_dir, face_filename)
-        face_image.save(face_path)
         
-        # Store face data in database (using simple coordinates as "encoding")
+        # Save as high-quality grayscale image (like the sample images)
+        cv2.imwrite(face_path, face_final, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        
+        # Store face data in database - đơn giản hóa
         face_encoding = {
             'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h),
             'face_file': face_filename,
-            'capture_time': datetime.now().isoformat()
+            'capture_time': datetime.now().isoformat(),
+            'processed': True,
+            'standard_size': (128, 128),
+            'quality_score': float(min(1.0, (w * h) / (gray.shape[0] * gray.shape[1] * 0.1)))
         }
-        
-        # Calculate quality score based on face size
-        quality_score = min(1.0, (w * h) / (image_array.shape[0] * image_array.shape[1] * 0.1))
         
         # Update student record with face data
         from models.database import get_db_connection
@@ -213,13 +226,18 @@ def capture_face():
         
         return jsonify({
             'success': True,
-            'message': f'Thu thập ảnh #{image_count} thành công cho {student["full_name"]}',
+            'message': f'Thu thập ảnh #{image_count} thành công cho {student["full_name"]} (quy trình đơn giản)',
             'student': {
                 'id': student_id,
                 'name': student['full_name'],
                 'face_file': face_filename,
                 'image_count': image_count,
-                'total_images': image_count
+                'total_images': image_count,
+                'processed_info': {
+                    'size': (128, 128),
+                    'simple_processing': True,
+                    'grayscale_crop_only': True
+                }
             }
         })
         
@@ -300,6 +318,83 @@ def api_subjects_by_class(class_id):
     conn.close()
     
     return jsonify([dict(row) for row in subjects])
+
+@app.route('/api/face_collection_status/<student_id>')
+@login_required
+def get_face_collection_status(student_id):
+    """API kiểm tra trạng thái thu thập khuôn mặt"""
+    try:
+        student_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'faces', student_id)
+        
+        if not os.path.exists(student_dir):
+            return jsonify({
+                'success': True,
+                'student_id': student_id,
+                'image_count': 0,
+                'progress_percent': 0,
+                'is_complete': False,
+                'can_train': False,
+                'status': 'not_started'
+            })
+        
+        # Đếm ảnh hiện có
+        image_files = [f for f in os.listdir(student_dir) if f.lower().endswith('.jpg')]
+        image_count = len(image_files)
+        
+        # Tính trạng thái
+        progress_percent = (image_count / 40) * 100
+        is_complete = image_count >= 40
+        can_train = image_count >= 10  # Tối thiểu 10 ảnh để train
+        
+        if image_count == 0:
+            status = 'not_started'
+        elif image_count < 10:
+            status = 'collecting'
+        elif image_count < 40:
+            status = 'ready_for_train'
+        else:
+            status = 'complete'
+        
+        return jsonify({
+            'success': True,
+            'student_id': student_id,
+            'image_count': image_count,
+            'total_target': 40,
+            'progress_percent': round(progress_percent, 1),
+            'is_complete': is_complete,
+            'can_train': can_train,
+            'status': status,
+            'images': [f"/uploads/faces/{student_id}/{img}" for img in sorted(image_files)[-5:]]  # 5 ảnh gần nhất
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
+
+@app.route('/api/reset_face_collection/<student_id>', methods=['POST'])
+@login_required
+def reset_face_collection(student_id):
+    """API reset thu thập khuôn mặt (xóa tất cả ảnh)"""
+    try:
+        student_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'faces', student_id)
+        
+        if os.path.exists(student_dir):
+            import shutil
+            shutil.rmtree(student_dir)
+            
+        # Cập nhật database
+        from models.database import get_db_connection
+        conn = get_db_connection()
+        conn.execute('UPDATE students SET photo_path = NULL WHERE student_id = ?', (student_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã reset thu thập khuôn mặt cho sinh viên {student_id}'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
 
 if __name__ == '__main__':
     # Khởi tạo database

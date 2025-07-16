@@ -2,7 +2,10 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
   <h1 class="h2"><i class="fas fa-user-graduate me-2"></i>Quản lý sinh viên</h1>
   <div class="btn-toolbar mb-2 mb-md-0">
-    <a href="{{ url_for('students.add_student') }}" class="btn btn-primary"> <i class="fas fa-plus me-1"></i>Thêm sinh viên </a>
+    <div class="btn-group me-2">
+      <a href="{{ url_for('students.add_student') }}" class="btn btn-primary"> <i class="fas fa-plus me-1"></i>Thêm sinh viên </a>
+      <a href="{{ url_for('students.import_excel') }}" class="btn btn-success"> <i class="fas fa-file-excel me-1"></i>Import Excel </a>
+    </div>
   </div>
 </div>
 

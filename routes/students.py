@@ -1,11 +1,23 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
-from models.database import get_db_connection
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_file
+from models.database import get_db_connection, import_students_from_excel, create_excel_template
 import os
 import cv2
 import numpy as np
 from PIL import Image
 from werkzeug.utils import secure_filename
 import json
+from functools import wraps
+
+# Import login_required decorator từ app.py
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from flask import session
+        if not session.get('logged_in'):
+            flash('Vui lòng đăng nhập để truy cập!', 'warning')
+            return redirect(url_for('auth.login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 students_bp = Blueprint('students', __name__)
@@ -523,3 +535,80 @@ def api_subjects_by_class(class_id):
     conn.close()
     
     return jsonify([dict(row) for row in subjects])
+
+# =========================
+# IMPORT STUDENTS FROM EXCEL
+# =========================
+@students_bp.route('/import_excel', methods=['GET', 'POST'])
+@login_required
+def import_excel():
+    """Import sinh viên từ file Excel"""
+    if request.method == 'GET':
+        # Hiển thị form upload
+        conn = get_db_connection()
+        classes = conn.execute('SELECT * FROM classes ORDER BY class_name').fetchall()
+        conn.close()
+        return render_template('students/import_excel.html', classes=classes)
+    
+    # Xử lý POST request
+    if 'excel_file' not in request.files:
+        flash('Không có file được chọn!', 'error')
+        return redirect(request.url)
+    
+    file = request.files['excel_file']
+    class_id = request.form.get('class_id', type=int)
+    
+    if file.filename == '':
+        flash('Không có file được chọn!', 'error')
+        return redirect(request.url)
+    
+    if not class_id:
+        flash('Vui lòng chọn lớp học!', 'error')
+        return redirect(request.url)
+    
+    if file and file.filename.lower().endswith(('.xlsx', '.xls')):
+        try:
+            # Lưu file tạm thời
+            filename = secure_filename(file.filename)
+            temp_path = os.path.join('uploads', 'temp_' + filename)
+            
+            # Tạo thư mục nếu chưa có
+            os.makedirs('uploads', exist_ok=True)
+            
+            file.save(temp_path)
+            
+            # Import sinh viên
+            result = import_students_from_excel(temp_path, class_id)
+            
+            # Xóa file tạm
+            os.remove(temp_path)
+            
+            if result['success']:
+                flash(result['message'], 'success')
+                if result['errors']:
+                    flash(f"Có {len(result['errors'])} lỗi: {'; '.join(result['errors'][:3])}", 'warning')
+            else:
+                flash(result['message'], 'error')
+                
+        except Exception as e:
+            flash(f'Lỗi xử lý file: {str(e)}', 'error')
+    else:
+        flash('Chỉ chấp nhận file Excel (.xlsx, .xls)!', 'error')
+    
+    return redirect(url_for('students.list_students'))
+
+@students_bp.route('/download_template')
+@login_required
+def download_template():
+    """Tải template Excel mẫu"""
+    try:
+        template_path = create_excel_template()
+        return send_file(
+            template_path,
+            as_attachment=True,
+            download_name='template_students.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        flash(f'Lỗi tạo template: {str(e)}', 'error')
+        return redirect(url_for('students.list_students'))

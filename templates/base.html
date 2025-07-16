@@ -63,19 +63,6 @@
               </ul>
             </li>
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="bi bi-calendar-check-fill icon-attendance me-1"></i>Điểm danh </a>
-              <ul class="dropdown-menu">
-                <li><hr class="dropdown-divider" /></li>
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('attendance.create_auto_session') }}"> <i class="bi bi-robot icon-ai me-2"></i>Tạo ca tự động </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('attendance.auto_session_manager') }}"> <i class="bi bi-gear-fill icon-wrench me-2"></i>Quản lý ca tự động </a>
-                </li>
-                <li><hr class="dropdown-divider" /></li>
-              </ul>
-            </li>
-            <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="bi bi-robot icon-ai me-1"></i>AI & Training </a>
               <ul class="dropdown-menu">
                 <li>
@@ -84,15 +71,22 @@
                 <li>
                   <a class="dropdown-item" href="{{ url_for('ai.test') }}"> <i class="bi bi-flask icon-ai me-2"></i>Test Nhận diện </a>
                 </li>
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('ai.test_accuracy') }}"> <i class="bi bi-graph-up icon-chart me-2"></i>Test Accuracy </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('ai.debug_model') }}"> <i class="bi bi-bug icon-wrench me-2"></i>Debug Model </a>
-                </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
                   <a class="dropdown-item" href="{{ url_for('students.collect_face_data') }}"> <i class="bi bi-camera-fill icon-camera me-2"></i>Thu thập ảnh </a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"> <i class="bi bi-camera-video-fill icon-attendance me-1"></i>Điểm danh </a>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('attendance.list_sessions') }}"> <i class="bi bi-list-ul icon-session me-2"></i>Danh sách ca điểm danh </a>
+                </li>
+
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('attendance.auto_session_manager') }}"> <i class="bi bi-robot icon-auto me-2"></i>Điểm danh tự động </a>
                 </li>
               </ul>
             </li>

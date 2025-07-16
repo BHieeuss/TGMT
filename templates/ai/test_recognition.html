@@ -298,7 +298,7 @@
       let html = "";
 
       result.faces.forEach((face, index) => {
-        const confidence = Math.round(face.confidence * 100);
+        const confidence = Math.round(face.confidence);
         const isRecognized = face.student_id !== null;
 
         html += `
@@ -328,9 +328,9 @@
                     }
                     
                     <div class="mb-2">
-                        <small>Độ tin cậy: ${confidence}%</small>
+                        <small>Độ tin cậy: ${confidence} (càng thấp càng tin cậy)</small>
                         <div class="confidence-bar">
-                            <div class="confidence-fill" style="width: ${confidence}%"></div>
+                            <div class="confidence-fill" style="width: ${Math.max(0, 100 - confidence)}%"></div>
                         </div>
                     </div>
                 </div>
@@ -378,7 +378,7 @@
 
         // Draw label background
         const label = isRecognized ? face.name : "Unknown";
-        const confidence = face.confidence ? ` (${(face.confidence * 100).toFixed(1)}%)` : "";
+        const confidence = face.confidence ? ` (${face.confidence.toFixed(1)})` : "";
         const fullLabel = label + confidence;
 
         ctx.fillStyle = isRecognized ? "#28a745" : "#ffc107";

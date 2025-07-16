@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 import base64
 import io
+import os
 from PIL import Image
 import json
 from datetime import datetime
@@ -16,6 +17,7 @@ from auto_attendance_server import create_auto_attendance_session, stop_auto_att
 import webbrowser
 import threading
 import time
+import pickle
 
 attendance_bp = Blueprint('attendance', __name__)
 
@@ -229,96 +231,171 @@ def capture_face():
         face_dir = os.path.join('uploads', 'faces', student_code)
         os.makedirs(face_dir, exist_ok=True)
         
-        # Count existing images
+        # Count existing images và kiểm tra giới hạn
         existing_files = [f for f in os.listdir(face_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-        next_number = len(existing_files) + 1
+        current_count = len(existing_files)
+        max_images = 40  # Giới hạn 40 ảnh
         
-        # Generate filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{student_code}_{next_number:03d}_{timestamp}.jpg"
+        # Kiểm tra đã đủ 40 ảnh chưa
+        if current_count >= max_images:
+            return jsonify({
+                'success': False, 
+                'message': f'Đã đủ {max_images} ảnh cho sinh viên này! Không thể thu thập thêm.',
+                'current_count': current_count,
+                'max_allowed': max_images,
+                'action': 'complete'
+            })
+        
+        next_number = current_count + 1
+        
+        # Generate filename đơn giản: 1.jpg, 2.jpg, ..., 40.jpg
+        filename = f"{next_number}.jpg"
         filepath = os.path.join(face_dir, filename)
         
-        # ============= XỨLÝ ẢNH CAO CẤP =============
+        # ========== XỬ LÝ ẢNH ĐỂ KHÔI TỰ NHIÊN - GIẢM BIẾN DẠNG ==========
         
-        # 1. Detect face với accuracy cao hơn
+        # 1. Convert sang grayscale nhẹ nhàng
+        gray_original = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
+        # 2. Chỉ cân bằng độ sáng nhẹ nếu cần thiết
+        # Kiểm tra độ sáng trung bình trước
+        mean_brightness = np.mean(gray_original)
+        
+        if mean_brightness < 80:
+            # Ảnh quá tối - cần cải thiện
+            gray_enhanced = cv2.equalizeHist(gray_original)
+        elif mean_brightness > 180:
+            # Ảnh quá sáng - giảm độ sáng nhẹ
+            gray_enhanced = cv2.convertScaleAbs(gray_original, alpha=0.8, beta=0)
+        else:
+            # Ảnh đã ổn - giữ nguyên
+            gray_enhanced = gray_original.copy()
+        
+        # 3. Detect face với tham số cơ bản
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         
-        # Cải thiện detection với nhiều scale
+        # Chỉ sử dụng 1 phương pháp detect đơn giản
         faces = face_cascade.detectMultiScale(
-            gray, 
-            scaleFactor=1.05,  # Tăng độ chính xác
-            minNeighbors=5,    # Giảm false positive
-            minSize=(80, 80),  # Kích thước tối thiểu
-            maxSize=(400, 400) # Kích thước tối đa
+            gray_enhanced, 
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(80, 80),
+            maxSize=(400, 400)
         )
         
         if len(faces) == 0:
-            return jsonify({'success': False, 'message': 'Không phát hiện khuôn mặt trong ảnh. Vui lòng đảm bảo khuôn mặt rõ nét và đủ sáng.'})
+            # Thử lại với tham số dễ hơn
+            faces = face_cascade.detectMultiScale(
+                gray_enhanced, 
+                scaleFactor=1.05,
+                minNeighbors=4,
+                minSize=(60, 60),
+                maxSize=(500, 500)
+            )
+        
+        if len(faces) == 0:
+            return jsonify({'success': False, 'message': 'Không phát hiện khuôn mặt trong ảnh. Vui lòng đảm bảo khuôn mặt rõ nét, đủ sáng và nhìn thẳng camera.'})
         
         if len(faces) > 1:
-            return jsonify({'success': False, 'message': 'Phát hiện nhiều khuôn mặt, vui lòng chỉ có 1 người trong ảnh'})
+            return jsonify({'success': False, 'message': f'Phát hiện {len(faces)} khuôn mặt, vui lòng chỉ có 1 người trong ảnh'})
         
-        # 2. Lấy khuôn mặt lớn nhất (closest to camera)
-        face = max(faces, key=lambda f: f[2] * f[3])  # Sort by area
-        x, y, w, h = face
+        # 4. Lấy khuôn mặt duy nhất
+        x, y, w, h = faces[0]
         
-        # 3. Mở rộng vùng crop để có thêm context (20% padding)
-        padding = int(min(w, h) * 0.2)
-        x_start = max(0, x - padding)
-        y_start = max(0, y - padding)
-        x_end = min(img.shape[1], x + w + padding)
-        y_end = min(img.shape[0], y + h + padding)
+        # 5. Crop với padding vừa phải
+        padding_ratio = 0.1  # Giảm padding để tự nhiên hơn
+        padding_x = int(w * padding_ratio)
+        padding_y = int(h * padding_ratio)
         
-        # 4. Crop face region
-        face_img = img[y_start:y_end, x_start:x_end]
+        x_start = max(0, x - padding_x)
+        y_start = max(0, y - padding_y)
+        x_end = min(gray_enhanced.shape[1], x + w + padding_x)
+        y_end = min(gray_enhanced.shape[0], y + h + padding_y)
         
-        if face_img.size == 0:
+        # Crop từ ảnh đã xử lý nhẹ
+        face_gray = gray_enhanced[y_start:y_end, x_start:x_end]
+        
+        if face_gray.size == 0:
             return jsonify({'success': False, 'message': 'Lỗi khi crop khuôn mặt'})
         
-        # 5. Kiểm tra chất lượng ảnh (blur detection)
-        gray_face = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
-        blur_score = cv2.Laplacian(gray_face, cv2.CV_64F).var()
+        # 6. Kiểm tra chất lượng ảnh cơ bản
+        blur_score = cv2.Laplacian(face_gray, cv2.CV_64F).var()
+        if blur_score < 50:  # Giảm threshold để dễ dàng hơn
+            return jsonify({'success': False, 'message': f'Ảnh bị mờ (điểm: {blur_score:.0f}), vui lòng chụp lại rõ nét hơn'})
         
-        if blur_score < 100:  # Threshold for blur
-            return jsonify({'success': False, 'message': 'Ảnh bị mờ, vui lòng chụp lại với khuôn mặt rõ nét hơn'})
+        # 7. Resize về kích thước chuẩn TỰ NHIÊN
+        target_size = 128
         
-        # 6. Chuẩn hóa kích thước face (224x224 - chuẩn cho deep learning)
-        face_resized = cv2.resize(face_img, (224, 224), interpolation=cv2.INTER_LANCZOS4)
+        # Make square một cách nhẹ nhàng
+        height, width = face_gray.shape
+        if width != height:
+            max_dim = max(width, height)
+            delta_w = max_dim - width
+            delta_h = max_dim - height
+            top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+            left, right = delta_w // 2, delta_w - (delta_w // 2)
+            
+            # Pad với giá trị trung bình để tự nhiên
+            mean_val = np.mean(face_gray)
+            face_gray = cv2.copyMakeBorder(face_gray, top, bottom, left, right, 
+                                         cv2.BORDER_CONSTANT, value=mean_val)
         
-        # 7. Cải thiện chất lượng ảnh
-        # Cân bằng histogram cho độ sáng đều
-        lab = cv2.cvtColor(face_resized, cv2.COLOR_BGR2LAB)
-        l, a, b = cv2.split(lab)
-        l = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4,4)).apply(l)
-        enhanced = cv2.merge([l, a, b])
-        face_enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+        # Resize với chất lượng cao nhưng không quá mịn
+        face_resized = cv2.resize(face_gray, (target_size, target_size), 
+                                interpolation=cv2.INTER_AREA)  # Đổi từ LANCZOS4 sang AREA để tự nhiên hơn
         
-        # 8. Tăng độ sắc nét nhẹ
-        kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-        face_sharpened = cv2.filter2D(face_enhanced, -1, kernel)
-        face_final = cv2.addWeighted(face_enhanced, 0.7, face_sharpened, 0.3, 0)
+        # 8. XỬ LÝ TỐI THIỂU ĐỂ TRÁNH BIẾN DẠNG
+        # Chỉ làm 1 bước đơn giản: cân bằng độ sáng nhẹ nếu cần
+        final_brightness = np.mean(face_resized)
         
-        # 9. Kiểm tra brightness
-        mean_brightness = np.mean(cv2.cvtColor(face_final, cv2.COLOR_BGR2GRAY))
-        if mean_brightness < 50:
-            return jsonify({'success': False, 'message': 'Ảnh quá tối, vui lòng chụp ở nơi có đủ ánh sáng'})
-        elif mean_brightness > 200:
-            return jsonify({'success': False, 'message': 'Ảnh quá sáng, vui lòng tránh ánh sáng trực tiếp'})
+        if final_brightness < 60:
+            # Quá tối - tăng độ sáng nhẹ
+            face_final = cv2.convertScaleAbs(face_resized, alpha=1.2, beta=20)
+        elif final_brightness > 200:
+            # Quá sáng - giảm độ sáng nhẹ  
+            face_final = cv2.convertScaleAbs(face_resized, alpha=0.8, beta=-10)
+        else:
+            # Đã ổn - giữ nguyên hoàn toàn
+            face_final = face_resized.copy()
         
-        # 10. Save processed image với chất lượng cao
-        cv2.imwrite(filepath, face_final, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        # 9. Kiểm tra brightness cuối cùng
+        mean_brightness = np.mean(face_final)
+        if mean_brightness < 30:
+            return jsonify({'success': False, 'message': f'Ảnh quá tối (độ sáng: {mean_brightness:.0f}), vui lòng chụp ở nơi sáng hơn'})
+        elif mean_brightness > 230:
+            return jsonify({'success': False, 'message': f'Ảnh quá sáng (độ sáng: {mean_brightness:.0f}), vui lòng tránh ánh sáng trực tiếp'})
+        
+        # 10. Lưu ảnh tự nhiên
+        cv2.imwrite(filepath, face_final, [cv2.IMWRITE_JPEG_QUALITY, 95])  # Giảm chất lượng để tự nhiên hơn
+        
+        # Kiểm tra xem đã đủ 40 ảnh chưa
+        remaining = max_images - next_number
+        is_complete = next_number >= max_images
+        
+        if is_complete:
+            message = f'🎉 HOÀN THÀNH! Đã thu thập đủ {max_images} ảnh chất lượng cao'
+            action = 'complete'
+        else:
+            message = f'✅ Đã lưu ảnh {next_number}/{max_images} - Còn {remaining} ảnh'
+            action = 'continue'
         
         return jsonify({
             'success': True, 
-            'message': f'Đã lưu ảnh {next_number} (chất lượng: {blur_score:.0f}, độ sáng: {mean_brightness:.0f})',
+            'message': message,
             'filename': filename,
             'total_images': next_number,
+            'max_images': max_images,
+            'remaining': remaining,
+            'is_complete': is_complete,
+            'action': action,
+            'progress_percent': round((next_number / max_images) * 100, 1),
             'quality_info': {
                 'blur_score': round(blur_score, 1),
                 'brightness': round(mean_brightness, 1),
-                'face_size': f"{w}x{h}",
-                'processed_size': "224x224"
+                'original_face_size': f"{w}x{h}",
+                'processed_size': f"{target_size}x{target_size}",
+                'format': 'Grayscale tự nhiên - giảm biến dạng',
+                'enhancements': 'Chỉ cân bằng độ sáng nhẹ khi cần thiết'
             }
         })
         
@@ -327,34 +404,74 @@ def capture_face():
 
 @attendance_bp.route('/api/train_model', methods=['POST'])
 def train_model():
-    """API train model AI với dữ liệu khuôn mặt đã thu thập"""
+    """API train model - Sử dụng hàm thống nhất từ ai.py"""
     try:
-        from models.advanced_face_model import face_model
+        # Import hàm train từ ai.py để tránh duplicate code
+        from routes.ai import train_simple_model
         
-        # Start training in background
-        import threading
+        # Gọi hàm train chính
+        result = train_simple_model()
         
-        def train_in_background():
-            try:
-                result = face_model.train_model()
-                if result['success']:
-                    print(f"✅ Training completed: {result['message']}")
-                else:
-                    print(f"❌ Training failed: {result['message']}")
-            except Exception as e:
-                print(f"❌ Training error: {e}")
-        
-        training_thread = threading.Thread(target=train_in_background)
-        training_thread.daemon = True
-        training_thread.start()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Đã bắt đầu train model. Quá trình này có thể mất vài phút...'
-        })
+        # Trả về JSON response
+        return jsonify(result)
         
     except Exception as e:
-        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
+        return jsonify({'success': False, 'message': f'Lỗi training: {str(e)}'})
+
+@attendance_bp.route('/api/recognize_simple', methods=['POST'])
+def recognize_simple():
+    """API nhận diện khuôn mặt đơn giản - Sử dụng hàm thống nhất từ utils"""
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+        
+        if not image_data:
+            return jsonify({'success': False, 'message': 'Không có dữ liệu ảnh'})
+        
+        # Sử dụng hàm nhận diện thống nhất từ utils
+        from utils.face_recognition_utils import recognize_face_from_image
+        
+        # Nhận diện với confidence threshold phù hợp thực tế (110) - cao hơn mức 85-95 để đảm bảo chính xác
+        recognition_result = recognize_face_from_image(image_data, confidence_threshold=110)
+        
+        # Trả về kết quả nhận diện với format tương thích
+        if recognition_result['success']:
+            faces = recognition_result.get('faces', [])
+            
+            # Chuyển đổi format để tương thích với frontend cũ
+            recognized_faces = []
+            for face in faces:
+                if face['status'] == 'recognized':
+                    recognized_faces.append({
+                        'student_id': face['mssv'],
+                        'confidence': face['confidence'],
+                        'bbox': {'x': int(face['bbox']['x']), 'y': int(face['bbox']['y']), 
+                                'w': int(face['bbox']['w']), 'h': int(face['bbox']['h'])}
+                    })
+                else:
+                    recognized_faces.append({
+                        'student_id': 'Unknown',
+                        'confidence': face['confidence'],
+                        'bbox': {'x': int(face['bbox']['x']), 'y': int(face['bbox']['y']), 
+                                'w': int(face['bbox']['w']), 'h': int(face['bbox']['h'])}
+                    })
+            
+            return jsonify({
+                'success': True,
+                'message': f'Nhận diện {len(recognized_faces)} khuôn mặt',
+                'faces': recognized_faces,
+                'total_faces': len(faces)
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'message': recognition_result.get('message', 'Không nhận diện được khuôn mặt'),
+                'faces': [],
+                'total_faces': 0
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Lỗi nhận diện: {str(e)}'})
 
 @attendance_bp.route('/face_recognition/<int:session_id>')
 def face_recognition_page(session_id):
@@ -397,7 +514,7 @@ def face_recognition():
 
 @attendance_bp.route('/api/recognize_face', methods=['POST'])
 def recognize_face():
-    """API nhận diện khuôn mặt với AI model"""
+    """API nhận diện khuôn mặt với hàm thống nhất"""
     try:
         data = request.get_json()
         session_id = data.get('session_id')
@@ -406,39 +523,34 @@ def recognize_face():
         if not session_id or not image_data:
             return jsonify({'success': False, 'message': 'Thiếu dữ liệu'})
         
-        # Sử dụng AI model để nhận diện
-        from models.advanced_face_model import face_model
+        # Sử dụng hàm nhận diện thống nhất
+        from utils.face_recognition_utils import recognize_face_from_image
         
-        if not face_model.is_trained:
-            return jsonify({'success': False, 'message': 'Model AI chưa được train'})
+        # Nhận diện khuôn mặt với ngưỡng cân bằng (100) - phù hợp với thực tế confidence 85-95
+        recognition_result = recognize_face_from_image(image_data, confidence_threshold=100)
         
-        # Nhận diện khuôn mặt - sử dụng ensemble=True để có kết quả tốt nhất
-        recognition_result = face_model.recognize_face(image_data, use_ensemble=True)
-        
-        # Trả về kết quả chi tiết bao gồm cả những khuôn mặt không nhận diện được
+        # Trả về kết quả nhận diện
         if recognition_result['success']:
-            # Trả về tất cả kết quả, bao gồm cả những khuôn mặt không đạt ngưỡng
-            all_faces = recognition_result.get('faces', [])
+            faces = recognition_result.get('faces', [])
             
-            # Thêm thông tin về những khuôn mặt được phát hiện nhưng không đủ điều kiện
-            # (model có thể detect nhưng confidence/quality thấp)
+            # Chuyển đổi format cho frontend
             detected_faces = []
-            
-            for face in all_faces:
-                # Chỉ thêm vào detected_faces những khuôn mặt có student_id (đã train)
-                if face.get('student_id'):
-                    detected_faces.append(face)
+            for face in faces:
+                if face['status'] == 'recognized':
+                    detected_faces.append({
+                        'student_id': face['mssv'],
+                        'name': face['mssv'],  # Có thể lookup tên từ DB
+                        'confidence': face['confidence'],
+                        'position': face['bbox'],
+                        'status': 'recognized'
+                    })
                 else:
-                    # Khuôn mặt phát hiện được nhưng không đủ điều kiện
-                    # Tạo face record cho việc hiển thị debug info
                     detected_faces.append({
                         'student_id': None,
                         'name': 'Không nhận diện được',
-                        'confidence': face.get('confidence', 0),
-                        'quality_score': face.get('quality_score', 0),
-                        'combined_score': face.get('combined_score', 0),
-                        'quality_reasons': face.get('quality_reasons', []),
-                        'position': face.get('position', {})
+                        'confidence': face['confidence'],
+                        'position': face['bbox'],
+                        'status': face['status']
                     })
             
             return jsonify({
@@ -453,87 +565,158 @@ def recognize_face():
                 'faces': []
             })
         
-        # Lấy khuôn mặt có confidence cao nhất trong số những khuôn mặt được nhận diện
-        valid_faces = [f for f in recognition_result.get('faces', []) if f.get('student_id')]
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
+
+
+@attendance_bp.route('/api/mark_attendance', methods=['POST'])
+def mark_attendance_api():
+    """API điểm danh với hàm thống nhất"""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+        image_data = data.get('image')
         
-        if not valid_faces:
-            return jsonify({
-                'success': False, 
-                'message': 'Không nhận diện được sinh viên nào có độ tin cậy đủ cao',
-                'faces': recognition_result.get('faces', [])
-            })
+        if not session_id or not image_data:
+            return jsonify({'success': False, 'message': 'Thiếu dữ liệu'})
         
-        best_face = max(valid_faces, key=lambda x: x.get('combined_score', x.get('confidence', 0)))
-        
-        # Kiểm tra combined score nếu có
-        min_score = best_face.get('combined_score', best_face['confidence'])
-        if min_score < 0.6:  # Giữ ngưỡng 0.6 như yêu cầu
-            quality_info = ""
-            if 'quality_score' in best_face:
-                quality_info = f" (chất lượng: {best_face['quality_score']:.1%})"
-            return jsonify({
-                'success': False, 
-                'message': f'Độ tin cậy thấp ({min_score:.1%}){quality_info}, không đủ tin cậy để điểm danh',
-                'faces': recognition_result.get('faces', [])
-            })
-        
-        student_id = best_face['student_id']
-        
-        # Get session info và kiểm tra sinh viên có trong lớp không
+        # Lấy thông tin session
         conn = get_db_connection()
-        session_info = conn.execute('''
-            SELECT class_id FROM attendance_sessions WHERE id = ?
+        session = conn.execute('''
+            SELECT subject_id, class_id FROM attendance_sessions WHERE id = ?
         ''', (session_id,)).fetchone()
-        
-        student = conn.execute('''
-            SELECT id, student_id, full_name 
-            FROM students 
-            WHERE student_id = ? AND class_id = ?
-        ''', (student_id, session_info['class_id'])).fetchone()
-        
-        if not student:
-            conn.close()
-            return jsonify({'success': False, 'message': f'Sinh viên {student_id} không thuộc lớp này'})
-        
-        # Check if already attended
-        existing = conn.execute('''
-            SELECT id FROM attendance_records 
-            WHERE session_id = ? AND student_id = ?
-        ''', (session_id, student['id'])).fetchone()
-        
-        if existing:
-            conn.close()
-            return jsonify({
-                'success': False, 
-                'message': f'{student["full_name"]} đã điểm danh rồi!'
-            })
-        
-        # Record attendance
-        final_confidence = best_face.get('combined_score', best_face['confidence'])
-        conn.execute('''
-            INSERT INTO attendance_records (session_id, student_id, status, method, confidence)
-            VALUES (?, ?, 'present', 'face_recognition', ?)
-        ''', (session_id, student['id'], final_confidence * 100))
-        conn.commit()
         conn.close()
         
-        # Tạo message chi tiết
-        quality_info = ""
-        if 'quality_score' in best_face:
-            quality_info = f" - Chất lượng: {best_face['quality_score']:.1%}"
+        if not session:
+            return jsonify({'success': False, 'message': 'Không tìm thấy ca điểm danh'})
+        
+        # Sử dụng hàm nhận diện và điểm danh thống nhất
+        from utils.face_recognition_utils import recognize_and_mark_attendance
+        
+        result = recognize_and_mark_attendance(
+            image_data=image_data,
+            subject_id=session['subject_id'],
+            session_id=session_id,
+            confidence_threshold=98  # Giảm để dễ điểm danh hơn với thực tế 85-95
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
+
+
+# ================================
+# DEBUG & TESTING
+# ================================
+
+@attendance_bp.route('/api/debug_recognition', methods=['POST'])
+def debug_recognition():
+    """API debug để kiểm tra nhận diện khuôn mặt"""
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+        debug_mode = data.get('debug', False)
+        
+        if not image_data:
+            return jsonify({'success': False, 'message': 'Không có dữ liệu ảnh'})
+        
+        # Kiểm tra model có tồn tại không
+        model_info = {}
+        trainer_path = os.path.join('uploads', 'trainer.yml')
+        labels_path = os.path.join('uploads', 'labels.pickle')
+        
+        model_info['trainer_exists'] = os.path.exists(trainer_path)
+        model_info['labels_exists'] = os.path.exists(labels_path)
+        
+        if model_info['trainer_exists'] and model_info['labels_exists']:
+            # Load labels để xem có bao nhiêu sinh viên
+            try:
+                with open(labels_path, 'rb') as f:
+                    labels = pickle.load(f)
+                model_info['total_students'] = len(labels)
+                model_info['student_list'] = list(labels.keys())
+            except Exception as e:
+                model_info['load_error'] = str(e)
+        
+        # Thử nhận diện với các ngưỡng phù hợp thực tế (confidence thường 85-95)
+        results = {}
+        thresholds = [90, 95, 100, 105, 110, 120]  # Tập trung vào vùng thực tế
+        
+        for threshold in thresholds:
+            try:
+                from utils.face_recognition_utils import recognize_face_from_image
+                result = recognize_face_from_image(image_data, confidence_threshold=threshold)
+                results[f'threshold_{threshold}'] = {
+                    'success': result['success'],
+                    'faces_count': len(result.get('faces', [])),
+                    'recognized_count': len([f for f in result.get('faces', []) if f.get('status') == 'recognized']),
+                    'faces': result.get('faces', [])[:3],  # Chỉ lấy 3 face đầu để tránh quá dài
+                    'message': result.get('message', '')
+                }
+            except Exception as e:
+                results[f'threshold_{threshold}'] = {'error': str(e)}
         
         return jsonify({
             'success': True,
-            'message': f'Điểm danh thành công cho {student["full_name"]} (Độ tin cậy: {final_confidence:.1%}){quality_info}',
-            'student': {
-                'id': student['student_id'],
-                'name': student['full_name'],
-                'confidence': best_face['confidence'] * 100
-            }
+            'model_info': model_info,
+            'recognition_results': results,
+            'message': 'Debug hoàn tất'
         })
-            
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Lỗi debug: {str(e)}'})
+
+@attendance_bp.route('/api/model_info', methods=['GET'])
+def get_model_info():
+    """API lấy thông tin model"""
+    try:
+        info = {}
+        
+        # Kiểm tra files model
+        trainer_path = os.path.join('uploads', 'trainer.yml')
+        labels_path = os.path.join('uploads', 'labels.pickle')
+        faces_dir = os.path.join('uploads', 'faces')
+        
+        info['trainer_exists'] = os.path.exists(trainer_path)
+        info['labels_exists'] = os.path.exists(labels_path)
+        info['faces_dir_exists'] = os.path.exists(faces_dir)
+        
+        if info['trainer_exists']:
+            info['trainer_size'] = os.path.getsize(trainer_path)
+            info['trainer_modified'] = datetime.fromtimestamp(os.path.getmtime(trainer_path)).strftime('%Y-%m-%d %H:%M:%S')
+        
+        if info['labels_exists']:
+            try:
+                with open(labels_path, 'rb') as f:
+                    labels = pickle.load(f)
+                info['total_students'] = len(labels)
+                info['student_list'] = list(labels.keys())
+            except Exception as e:
+                info['labels_error'] = str(e)
+        
+        if info['faces_dir_exists']:
+            students = []
+            for student_dir in os.listdir(faces_dir):
+                student_path = os.path.join(faces_dir, student_dir)
+                if os.path.isdir(student_path):
+                    image_count = len([f for f in os.listdir(student_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+                    students.append({
+                        'student_id': student_dir,
+                        'image_count': image_count
+                    })
+            info['training_data'] = students
+            info['total_training_students'] = len(students)
+        
+        return jsonify({
+            'success': True,
+            'model_info': info,
+            'message': 'Thông tin model'
+        })
+        
     except Exception as e:
         return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
+
 
 # ================================
 # 3. ĐIỂM DANH THỦ CÔNG

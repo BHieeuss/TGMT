@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import face_recognition
 import pickle
+import base64
 from datetime import datetime
 import sqlite3
 from sklearn.svm import SVC
@@ -254,7 +255,7 @@ class FaceRecognitionAI:
                 'message': f'Lỗi training: {str(e)}'
             }
     
-    def recognize_face(self, image_data, confidence_threshold=0.6) -> Dict:
+    def recognize_face(self, image_data, confidence_threshold=120) -> Dict:
         """
         Nhận diện khuôn mặt từ ảnh
         Args:
