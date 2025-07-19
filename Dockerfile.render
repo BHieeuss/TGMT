@@ -1,41 +1,46 @@
-# Ultra-simplified Dockerfile for Render - Python 3.10 for stability
-FROM python:3.10-slim
+# FORCE PYTHON 3.10 - Render Build Fix
+FROM python:3.10.12-slim-bullseye
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (minimal)
+# Force Python version check
+RUN python --version
+
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and setuptools to latest stable versions
-RUN pip install --upgrade pip==23.3.1 setuptools==69.0.3 wheel==0.42.0
+# Install specific pip and setuptools versions that work
+RUN pip install --upgrade pip==23.2.1
+RUN pip install setuptools==68.0.0 wheel==0.41.2
 
-# Copy requirements first for better caching
-COPY requirements-render.txt .
+# Copy minimal requirements
+COPY requirements-render-minimal.txt ./requirements.txt
 
-# Install Python dependencies with explicit flags for Render compatibility
-RUN pip install --no-cache-dir --prefer-binary --no-build-isolation -r requirements-render.txt
+# Install packages one by one for better debugging
+RUN pip install --no-cache-dir Flask==2.2.5
+RUN pip install --no-cache-dir Werkzeug==2.2.3
+RUN pip install --no-cache-dir gunicorn==20.1.0
+RUN pip install --no-cache-dir Jinja2==3.1.2
 
-# Copy application code
+# Copy app
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p uploads/faces exports static logs backups
+# Create directories
+RUN mkdir -p uploads exports static logs
 
-# Set permissions
-RUN chmod -R 755 uploads exports logs backups
-
-# Environment variables for cloud
+# Environment
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
-ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PORT=5000
 
 # Expose port
 EXPOSE 5000
 
-# Simple start command (no health check for now)
-CMD ["python", "app.py"]
+# Start
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "app:app"]

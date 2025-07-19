@@ -1,4 +1,4 @@
-# Render.yaml - Configuration for Render.com deployment
+# Render.yaml - FORCE PYTHON 3.10 Configuration
 services:
   - type: web
     name: tgmt-face-attendance
@@ -7,7 +7,7 @@ services:
     plan: free
     region: singapore
     branch: main
-    # healthCheckPath: /health  # Disabled temporarily for debugging
+    # Force rebuild with new settings
     envVars:
       - key: FLASK_ENV
         value: production
@@ -17,6 +17,8 @@ services:
         value: 5000
       - key: PYTHONUNBUFFERED
         value: 1
+      - key: FORCE_PYTHON_310
+        value: true
     buildFilter:
       paths:
         - "**"

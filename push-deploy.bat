@@ -19,9 +19,10 @@ echo 3. Check git status
 echo 4. View recent commits
 echo 5. Force push (if needed)
 echo 6. 🔧 Fix Render deployment issues
-echo 7. Exit
+echo 7. 🚨 EMERGENCY: Force Python 3.10 fix
+echo 8. Exit
 echo.
-set /p choice="Enter your choice (1-7): "
+set /p choice="Enter your choice (1-8): "
 
 if "%choice%"=="1" goto quick_push
 if "%choice%"=="2" goto custom_push
@@ -29,7 +30,8 @@ if "%choice%"=="3" goto git_status
 if "%choice%"=="4" goto view_commits
 if "%choice%"=="5" goto force_push
 if "%choice%"=="6" goto fix_render
-if "%choice%"=="7" goto exit
+if "%choice%"=="7" goto emergency_fix
+if "%choice%"=="8" goto exit
 goto invalid_choice
 
 :quick_push
@@ -159,9 +161,47 @@ if errorlevel 1 (
     goto menu
 )
 
+:emergency_fix
+echo.
+echo ========================================
+echo   🚨 EMERGENCY: Force Python 3.10
+echo ========================================
+echo.
+echo [CRITICAL] Render vẫn dùng Python 3.13! 
+echo [SOLUTION] Force rebuild với Python 3.10.12 cụ thể
+echo.
+echo ⚠️  Điều này sẽ:
+echo   • Force push để clear cache
+echo   • Rebuild hoàn toàn từ đầu
+echo   • Chỉ cài minimal packages
+echo.
+set /p confirm="Bạn có chắc muốn emergency fix? (y/N): "
+if /i "%confirm%"=="y" (
+    git add .
+    git commit -m "🚨 EMERGENCY: Force Python 3.10.12 - Clear Render cache"
+    git push --force origin main
+    
+    if errorlevel 1 (
+        echo [ERROR] Emergency push failed!
+        pause
+        goto menu
+    ) else (
+        echo.
+        echo ✅ EMERGENCY FIX DEPLOYED!
+        echo ⏳ Render đang rebuild hoàn toàn...
+        echo 🌐 Check dashboard ngay!
+        pause
+        goto menu
+    )
+) else (
+    echo [INFO] Emergency fix cancelled.
+    pause
+    goto menu
+)
+
 :invalid_choice
 echo.
-echo [ERROR] Invalid choice. Please select 1-7.
+echo [ERROR] Invalid choice. Please select 1-8.
 echo.
 goto menu
 
