@@ -126,17 +126,22 @@ goto menu
 :fix_render
 echo.
 echo ========================================
-echo   Fix Render Deployment Issues
+echo   Fix Render Python/Setuptools Issue
 echo ========================================
 echo.
-echo [INFO] Applying fixes for Render deployment...
-echo   - Using simplified Dockerfile.render
-echo   - Stable package versions
-echo   - Optional OpenCV imports
+echo [INFO] Your error shows Python 3.13/setuptools compatibility issues
+echo [INFO] Applying fixes for stable Render deployment...
+echo.
+echo ✅ Fixes being applied:
+echo   • Python 3.13 → 3.10 (Render-stable)
+echo   • Fixed pip/setuptools versions
+echo   • Simplified package requirements
+echo   • Removed complex dependencies
+echo   • Disabled health check temporarily
 echo.
 
 git add .
-git commit -m "Fix Render deployment - simplified dependencies and optional OpenCV"
+git commit -m "🔧 Fix Render Python 3.13 setuptools issue - downgrade to Python 3.10 stable"
 git push origin main
 
 if errorlevel 1 (
@@ -145,9 +150,10 @@ if errorlevel 1 (
     goto menu
 ) else (
     echo.
-    echo ✅ Fixes applied and pushed!
-    echo ⏳ Render should deploy successfully now...
-    echo 💡 Face recognition may be limited but core features work.
+    echo ✅ Python compatibility fixes applied and pushed!
+    echo ⏳ Render should deploy successfully now with Python 3.10...
+    echo 💡 Face recognition may be limited but core features will work.
+    echo 🌐 Monitor your Render dashboard for the build progress.
     echo.
     pause
     goto menu

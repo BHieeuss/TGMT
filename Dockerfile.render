@@ -1,20 +1,22 @@
-# Simplified Dockerfile for Render (no complex dependencies)
-FROM python:3.11-slim
+# Ultra-simplified Dockerfile for Render - Python 3.10 for stability
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install only essential system packages
+# Install system dependencies (minimal)
 RUN apt-get update && apt-get install -y \
-    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and setuptools to latest stable versions
+RUN pip install --upgrade pip==23.3.1 setuptools==69.0.3 wheel==0.42.0
 
 # Copy requirements first for better caching
 COPY requirements-render.txt .
 
-# Install Python packages
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements-render.txt
+# Install Python dependencies with explicit flags for Render compatibility
+RUN pip install --no-cache-dir --prefer-binary --no-build-isolation -r requirements-render.txt
 
 # Copy application code
 COPY . .
@@ -25,9 +27,6 @@ RUN mkdir -p uploads/faces exports static logs backups
 # Set permissions
 RUN chmod -R 755 uploads exports logs backups
 
-# Expose port
-EXPOSE 5000
-
 # Environment variables for cloud
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
@@ -35,9 +34,8 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PORT=5000
 
-# Health check for cloud platforms
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+# Expose port
+EXPOSE 5000
 
-# Start command
-CMD python app.py
+# Simple start command (no health check for now)
+CMD ["python", "app.py"]

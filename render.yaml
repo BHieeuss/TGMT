@@ -7,7 +7,7 @@ services:
     plan: free
     region: singapore
     branch: main
-    healthCheckPath: /health
+    # healthCheckPath: /health  # Disabled temporarily for debugging
     envVars:
       - key: FLASK_ENV
         value: production

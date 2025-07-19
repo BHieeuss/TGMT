@@ -3,21 +3,30 @@ title TGMT - Fix Render Deploy
 
 echo.
 echo ========================================
-echo   Fix and Deploy to Render
+echo   Fix Render Deployment Issues
 echo ========================================
 echo.
 
-echo [INFO] This script will fix the build issues and deploy to Render
+echo [INFO] Fixing Python 3.13/setuptools compatibility issues on Render
+echo.
+
+echo ✅ Applied fixes:
+echo   • Downgraded to Python 3.10 (stable on Render)
+echo   • Fixed pip/setuptools to known working versions
+echo   • Simplified requirements with compatible packages
+echo   • Removed health check for debugging
+echo   • Added build isolation flags
 echo.
 
 echo [INFO] Step 1: Checking current status...
 git status
 
 echo.
-echo [INFO] Step 2: Adding fixes for cloud deployment...
+echo [INFO] Step 2: Adding all fixes...
 git add .
 
-echo [INFO] Step 3: Committing fixes...
+echo [INFO] Step 3: Committing Python compatibility fixes...
+git commit -m "🔧 Fix Render Python 3.13 setuptools issue - use Python 3.10 stable"
 git commit -m "Fix Render deployment issues - use simplified Dockerfile and requirements"
 
 echo [INFO] Step 4: Pushing to GitHub to trigger Render deploy...
