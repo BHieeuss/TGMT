@@ -1,0 +1,32 @@
+# Docker Compose for cloud deployment
+version: '3.8'
+
+services:
+  tgmt-cloud:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloud
+    container_name: tgmt-cloud-app
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      - FLASK_ENV=production
+      - PYTHONPATH=/app
+      - PORT=${PORT:-5000}
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+    volumes:
+      - app_data:/app/uploads
+      - app_exports:/app/exports
+      - app_db:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  app_data:
+  app_exports: 
+  app_db:

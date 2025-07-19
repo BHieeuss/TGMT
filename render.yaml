@@ -1,0 +1,24 @@
+# Render.yaml - Configuration for Render.com deployment
+services:
+  - type: web
+    name: tgmt-face-attendance
+    env: docker
+    dockerfilePath: ./Dockerfile.cloud
+    plan: free
+    region: singapore
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PORT
+        value: 5000
+    buildFilter:
+      paths:
+        - "**"
+      ignoredPaths:
+        - "README.md"
+        - "*.md"
+        - ".git/**"

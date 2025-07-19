@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  face-attendance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tgmt-face-attendance-prod
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./exports:/app/exports
+      - ./attendance_system.db:/app/attendance_system.db
+      - ./backups:/app/backups
+    environment:
+      - FLASK_ENV=production
+      - PYTHONPATH=/app
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      - FACE_RECOGNITION_TOLERANCE=${FACE_RECOGNITION_TOLERANCE:-0.6}
+      - MAX_FACE_IMAGES_PER_STUDENT=${MAX_FACE_IMAGES_PER_STUDENT:-50}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+        reservations:
+          memory: 1G
+          cpus: "0.5"
+
+  nginx:
+    image: nginx:alpine
+    container_name: tgmt-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      face-attendance:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - nginx
+
+  # Optional: Add database backup service
+  backup:
+    build: .
+    container_name: tgmt-backup
+    volumes:
+      - ./uploads:/app/uploads:ro
+      - ./exports:/app/exports:ro
+      - ./attendance_system.db:/app/attendance_system.db:ro
+      - ./backups:/app/backups
+    environment:
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *} # Daily at 2 AM
+    command: >
+      sh -c "
+        echo 'Starting backup service...'
+        crond -f
+      "
+    restart: unless-stopped
+    profiles:
+      - backup
+
+networks:
+  default:
+    name: tgmt-network

@@ -13,10 +13,21 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['EXPORT_FOLDER'] = 'exports'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Load configuration based on environment
+config_name = os.environ.get('FLASK_ENV', 'development')
+if config_name == 'production' or os.environ.get('DOCKER_ENV'):
+    config_name = 'docker'
+
+try:
+    from config import config
+    app.config.from_object(config[config_name])
+except ImportError:
+    # Fallback to basic configuration if config.py doesn't exist
+    app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
+    app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
+    app.config['EXPORT_FOLDER'] = os.environ.get('EXPORT_FOLDER', 'exports')
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Ensure upload and export directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -49,6 +60,40 @@ app.register_blueprint(subjects_bp, url_prefix='/subjects')
 app.register_blueprint(attendance_bp, url_prefix='/attendance')
 app.register_blueprint(reports_bp, url_prefix='/reports')
 app.register_blueprint(ai_bp)
+
+# Health check endpoint for monitoring
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring and load balancers"""
+    try:
+        # Check database connection
+        from models.database import get_db_connection
+        conn = get_db_connection()
+        conn.execute('SELECT 1').fetchone()
+        conn.close()
+        
+        # Check upload directory
+        upload_accessible = os.path.exists(app.config['UPLOAD_FOLDER']) and os.access(app.config['UPLOAD_FOLDER'], os.W_OK)
+        
+        # Check export directory
+        export_accessible = os.path.exists(app.config['EXPORT_FOLDER']) and os.access(app.config['EXPORT_FOLDER'], os.W_OK)
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'checks': {
+                'database': 'ok',
+                'upload_folder': 'ok' if upload_accessible else 'error',
+                'export_folder': 'ok' if export_accessible else 'error'
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }), 500
 
 @app.route('/')
 def index():
@@ -401,8 +446,12 @@ if __name__ == '__main__':
     from models.database import init_database
     init_database()
     
+    # Cloud deployment support
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    
     print("🎯 Face Attendance System Starting...")
-    print("📱 Access at: http://localhost:5000")
+    print(f"📱 Access at: http://localhost:{port}")
     print("👤 Login: admin / admin123")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=debug, host='0.0.0.0', port=port)

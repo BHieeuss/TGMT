@@ -1,0 +1,12 @@
+# This directory contains database and file backups
+# 
+# Backup files are created automatically by backup.sh script
+# and can be restored using restore.sh script
+#
+# File naming convention:
+# - attendance_system_YYYYMMDD_HHMMSS.db (database backup)
+# - uploads_YYYYMMDD_HHMMSS.tar.gz (student photos backup)
+# - exports_YYYYMMDD_HHMMSS.tar.gz (reports backup)
+# - full_backup_YYYYMMDD_HHMMSS.tar.gz (complete backup)
+#
+# Backups older than 30 days are automatically cleaned up

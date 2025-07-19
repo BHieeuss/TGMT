@@ -1,0 +1,12 @@
+# Railway.toml - Configuration for Railway.app
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.cloud"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "always"
+
+[networking]
+publicPort = 5000
