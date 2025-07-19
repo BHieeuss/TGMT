@@ -2,13 +2,23 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, f
 import os
 import sqlite3
 from datetime import datetime
-import cv2
-import numpy as np
+# Conditional imports for cloud deployment
+try:
+    import cv2
+    import numpy as np
+    OPENCV_AVAILABLE = True
+except ImportError:
+    OPENCV_AVAILABLE = False
+    print("⚠️  OpenCV not available - face recognition disabled for cloud deployment")
+
 from PIL import Image
 import base64
 import io
 import pandas as pd
-import pickle
+try:
+    import pickle
+except ImportError:
+    pickle = None
 from werkzeug.utils import secure_filename
 from functools import wraps
 
